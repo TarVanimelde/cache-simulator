@@ -36,10 +36,10 @@ public class DragonCacheBlock extends CacheBlock {
         // State is not changed by a local read.
         break;
       case SC:
-        // State is not changed by a cache-local read.
+        // State is not changed by a local read.
         break;
       case SM:
-        // State is not changed by a cache-local read.
+        // State is not changed by a local read.
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
@@ -51,8 +51,8 @@ public class DragonCacheBlock extends CacheBlock {
   @Override
   public void writeBlock(Address address) {
     /*
-      The state after writing to the block will depend on whether any other
-      caches hold a copy of the data at the time the job is finished:
+      The state after writing to the block will depend on whether any other caches hold a copy of
+      the data at the time the job is finished:
     */
     BiFunction<Cache, Address, CoherenceState> finalState = (Cache local, Address a) ->
         Bus.remoteCacheContains(local, a) ? CoherenceState.SM : CoherenceState.M;
@@ -65,7 +65,7 @@ public class DragonCacheBlock extends CacheBlock {
           this.state = CoherenceState.M;
         break;
       case M:
-        // State is not changed by a cache-local update.
+        // State is not changed by a local update.
         break;
       case SC:
         BusJob busRdSc = new BusJob(cache, address, BusAction.BUSUPD, finalState);

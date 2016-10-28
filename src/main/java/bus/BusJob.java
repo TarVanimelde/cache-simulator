@@ -69,7 +69,7 @@ public class BusJob {
           bytesTransferred = CacheProperties.WORD_SIZE;
           cyclesRemaining = new CycleCountdown(Bus.READ_WORD);
           break;
-        case EVICT:
+        case EVICTLRU:
           bytesTransferred = CacheProperties.getBlockSize();
           cyclesRemaining = new CycleCountdown(Bus.WRITE_TO_MEM);
         case NONE:
@@ -106,7 +106,7 @@ public class BusJob {
   private void onFinish() {
     if (isFinished() && action != BusAction.NONE) {
       switch (action) {
-        case EVICT:
+        case EVICTLRU:
           origin.finishEvictionFor(target);
           break;
         case BUSRDX:

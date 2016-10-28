@@ -4,6 +4,6 @@ public enum BusAction {
   BUSRD,
   BUSRDX,
   BUSUPD,
-  EVICT,
+  EVICTLRU,
   NONE
 }

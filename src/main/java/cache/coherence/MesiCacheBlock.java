@@ -97,13 +97,16 @@ public class MesiCacheBlock extends CacheBlock {
     switch (this.state) {
       case M:
         Bus.flush(cache, address, CoherenceState.I);
+        Bus.getStatistics().incrementBusInvalidations();
         break;
       case E:
         this.state = CoherenceState.I;
+        Bus.getStatistics().incrementBusInvalidations();
         //Bus.flush(cache, address, CoherenceState.I); // TODO
         break;
       case S:
         this.state = CoherenceState.I;
+        Bus.getStatistics().incrementBusInvalidations();
         break;
       case I:
         // State is not changed by a remote write.

@@ -29,7 +29,7 @@ public class Program {
     CoherencePolicy policy = CoherencePolicy.MSI;
     int cacheSize = 4096;
     int blockSize = 16;
-    int associativity = 4;
+    int associativity = 2;
     CacheProperties.setCoherencePolicy(policy);
     try {
       CacheProperties.setCacheSize(cacheSize);

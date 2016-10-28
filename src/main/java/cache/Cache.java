@@ -16,12 +16,8 @@ public class Cache {
 
   private List<CacheSet> sets; // The cache blocks, organized into sets.
 
-  /*
-    Processor information:
-   */
-
+  private BusJob busJob = BusJob.EMPTY_JOB; // The job the proc wants to/is performing on the bus.
   private boolean awaitingBus = false; // Is the cache waiting to finish a bus job?
-  private BusJob busJob = BusJob.EMPTY_JOB; // The job the
   private boolean isFlushing = false; // Is the cache in the process of flushing a block?
   private boolean isUpdating = false; // Is the cache in the process of having a word updated?
 
@@ -40,7 +36,7 @@ public class Cache {
   }
 
   public int getId() {
-    return this.id;
+    return id;
   }
 
   public void procRead(Address address) {
@@ -51,9 +47,7 @@ public class Cache {
     getSet(address).write(address);
   }
 
-  public void remoteRead(Address address) {
-    getSet(address).remoteRead(address);
-  }
+  public void remoteRead(Address address) { getSet(address).remoteRead(address); }
 
   public void remoteWrite(Address address) {
     getSet(address).remoteReadExclusive(address);
@@ -104,7 +98,7 @@ public class Cache {
   }
 
   public void setState(Address address, CoherenceState state) {
-    getSet(address).setState(address, state);
+    this.getSet(address).setState(address, state);
   }
 
   /*
@@ -150,7 +144,7 @@ public class Cache {
    * @param address the memory address that requires a block in the cache.
    */
   public boolean hasBlockAvailableFor(Address address) {
-    return this.contains(address) || getSet(address).hasAvailableBlock();
+    return contains(address) || getSet(address).hasAvailableBlock();
   }
 
   /**
@@ -159,7 +153,7 @@ public class Cache {
    */
   public void procEvictBlockFor(Address address) {
     if (!hasBlockAvailableFor(address)) {
-      getSet(address).procEvict(address);
+      this.getSet(address).procEvict(address);
     }
   }
 }

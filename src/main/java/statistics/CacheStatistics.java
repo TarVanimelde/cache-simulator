@@ -49,8 +49,6 @@ public class CacheStatistics {
     return id;
   }
 
-
-
   public String toString() {
     return "Cache ID: " + getId();
 //        + "Reads: " + getReads() + "\n"
