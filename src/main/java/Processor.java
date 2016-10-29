@@ -5,16 +5,16 @@ import cache.Instruction;
 import cache.Address;
 import statistics.ProcessorStatistics;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 
 public class Processor {
 
   private Cache l1; // The processor's cache.
 
-  private final List<Instruction> instructions; // The sequence of instructions to carry out.
-  private int instrCounter = -1; // The next instruction to process.
-
   private CycleCountdown nonmemInstr = new CycleCountdown(0); // A timer to wait out the cycles of an OTHER inst.
+  private final Deque<Instruction> instructions; // The sequence of instructions to carry out.
 
   private ProcessorStatistics stats = new ProcessorStatistics();
 
@@ -22,51 +22,50 @@ public class Processor {
     l1 = new Cache();
     Bus.add(l1);
     stats.attachCacheStats(l1.getStatistics());
-
-    this.instructions = instructions;
+    this.instructions = new ArrayDeque<>(instructions);
   }
 
 
   public void tick() {
     // Only do a cycle if there is work left:
-    if (!nonmemInstr.finished()) {
+    if (!nonmemInstr.isFinished()) {
       nonmemInstr.tick();
       stats.incrementCycles();
     } else if (hasInstructionsRemaining() && !l1.isBlocking()) {
-      instrCounter++;
-      Instruction instr = instructions.get(instrCounter);
+      Instruction instr = instructions.peek();
       Address address = new Address((int)instr.getValue());
       switch (instr.getType()) {
         case OTHER:
           nonmemInstr = new CycleCountdown(instr.getValue());
+          instructions.pop();
           break;
         case LOAD:
-          if (l1.contains(address)) {
-            stats.incrementReadHit();
-          } else {
-            stats.incrementReadMiss();
-          }
-
           if (!l1.contains(address) && !l1.hasBlockAvailableFor(address)) {
-            // Need to evict a block before loading the address, do that now:
-            l1.procEvictBlockFor(address);
+            // Need to startEvictionFor a block before loading the address, do that now:
+            l1.allocateBlockFor(address);
           } else {
+            if (l1.contains(address)) {
+              stats.incrementReadHit();
+            } else {
+              stats.incrementReadMiss();
+            }
             l1.procRead(address);
+            instructions.pop();
           }
 
           break;
         case STORE:
-          if (l1.contains(address)) {
-            stats.incrementWriteHit();
-          } else {
-            stats.incrementWriteMiss();
-          }
-
           if (!l1.contains(address) && !l1.hasBlockAvailableFor(address)) {
-            // Need to evict a block before storing the address, do that now:
-            l1.procEvictBlockFor(address);
+            // Need to startEvictionFor a block before storing the address, do that now:
+            l1.allocateBlockFor(address);
           } else {
+            if (l1.contains(address)) {
+              stats.incrementWriteHit();
+            } else {
+              stats.incrementWriteMiss();
+            }
             l1.procWrite(address);
+            instructions.pop();
           }
           break;
         default:
@@ -82,14 +81,14 @@ public class Processor {
 
   }
 
-  public boolean finished() {
+  public boolean isFinished() {
     return !hasInstructionsRemaining()
         && !l1.isBlocking()
-        && nonmemInstr.finished();
+        && nonmemInstr.isFinished();
   }
 
   public boolean hasInstructionsRemaining() {
-    return instrCounter + 1 < instructions.size();
+    return !instructions.isEmpty();
   }
 
   public ProcessorStatistics getStatistics() {

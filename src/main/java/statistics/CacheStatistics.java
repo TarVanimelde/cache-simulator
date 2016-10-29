@@ -1,12 +1,10 @@
 package statistics;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 public class CacheStatistics {
-  private final AtomicInteger writes = new AtomicInteger(0);
-  private final AtomicInteger writeMisses = new AtomicInteger(0);
-  private final AtomicInteger reads = new AtomicInteger(0);
-  private final AtomicInteger readMisses = new AtomicInteger(0);
+  private int writes = 0;
+  private int writeMisses = 0;
+  private int reads = 0;
+  private int readMisses = 0;
   private final int id;
 
   public CacheStatistics(int id) {
@@ -14,35 +12,35 @@ public class CacheStatistics {
   }
 
   public void incrementReads() {
-    reads.incrementAndGet();
+    reads++;
   }
 
   public void incrementReadMisses() {
-    readMisses.incrementAndGet();
+    readMisses++;
   }
 
   public void incrementWrites() {
-    writes.incrementAndGet();
+    writes++;
   }
 
   public void incrementWriteMisses() {
-    writeMisses.incrementAndGet();
+    writeMisses++;
   }
 
   public int getReads() {
-    return this.reads.get();
+    return this.reads;
   }
 
   public int getReadMisses() {
-    return this.readMisses.get();
+    return this.readMisses;
   }
 
   public int getWrites() {
-    return this.writes.get();
+    return this.writes;
   }
 
   public int getWriteMisses() {
-    return this.writeMisses.get();
+    return this.writeMisses;
   }
 
   public int getId() {

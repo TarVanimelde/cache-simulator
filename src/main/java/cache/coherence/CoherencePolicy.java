@@ -8,7 +8,7 @@ public enum CoherencePolicy {
   MSI,
   MESI,
   MESIF,
-  DRAGON; // DRAGON is equivalent to MOESI?
+  DRAGON;
 
   public static CacheBlock createStateMachine(Cache cache) {
     return createStateMachine(cache, new Address(-1));

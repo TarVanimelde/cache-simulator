@@ -20,11 +20,11 @@ public class MultiProcessor {
   }
 
   public void simulateProgram() {
-    boolean allProcsFinished = procs.stream().allMatch(Processor::finished);
+    boolean allProcsFinished = procs.stream().allMatch(Processor::isFinished);
     while (!allProcsFinished) {
       procs.forEach(Processor::tick);
       Bus.tick();
-      allProcsFinished = procs.stream().allMatch(Processor::finished);
+      allProcsFinished = procs.stream().allMatch(Processor::isFinished);
     }
   }
 

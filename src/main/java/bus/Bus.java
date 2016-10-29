@@ -5,94 +5,68 @@ import cache.Address;
 import cache.coherence.CoherenceState;
 import statistics.BusStatistics;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class Bus {
-  /**
-   * The job currently using the bus.
+  private static Deque<BusJob> jobQueue = new ArrayDeque<>();
+
+  /*
+    The job currently using the bus.
    */
   private static BusJob currentJob = BusJob.EMPTY_JOB;
 
   /**
    * The caches attached to the bus.
    */
-  private static List<Cache> caches = new ArrayList<>();
+  private static final List<Cache> caches = new ArrayList<>();
 
   /**
    * Statistics aggregator for bus information.
    */
-  public static final BusStatistics stats = new BusStatistics();
-
-  /**
-   * The index of caches that currently has a job executing.
-   */
-  private static int executingCache = 0;
+  private static final BusStatistics stats = new BusStatistics();
 
   private static boolean flushing = false; // Is the bus currently being used to flush to memory?
   private static FlushJob flushJob;
 
-  private static boolean propagatingUpdate = false; // Is an update being sent to remote caches?
-  private static UpdateJob updateJob;
-
   /*
    * The number of cycles it takes to perform certain actions over the bus:
    */
-  public static final int READ_FROM_MEM = 100; // It takes 100 cycles to read a block from memory.
-  public static final int WRITE_TO_MEM = 100; // It takes 100 cycles to write a block to memory.
-  public static final int READ_WORD = 1; // It takes one cycle to send one word over the bus.
+  public static final int READ_FROM_MEM_CYCLES = 100; // It takes 100 cycles to read a block from memory.
+  public static final int WRITE_TO_MEM_CYCLES = 100; // It takes 100 cycles to write a block to memory.
+  public static final int READ_WORD_CYCLES = 1; // It takes one cycle to send one word over the bus.
 
-  /**
-   * Grants use of the bus using round robin arbitration. If memory is being flushed to memory,
-   * this gets priority over other jobs.
-   */
   public static void tick() {
-    if (propagatingUpdate) {
-      // Prioritize updating data when necessary
-      updateJob.tick();
-      if (updateJob.finished()) {
-        propagatingUpdate = false;
-        stats.addBytesWritten(updateJob.getBytesTransferred());
-      }
-      return;
-    }
-
     if (flushing) {
       // Prioritize flushing data when necessary
       flushJob.tick();
       if (flushJob.finished()) {
         flushing = false;
-        stats.addBytesWritten(flushJob.getBytesTransferred());
       }
       return;
     }
 
+    // Get the next job if the current job is isFinished:
     if (currentJob.isFinished()) {
-      stats.addBytesWritten(currentJob.getBytesTransferred());
-      // Find the next job for the bus:
-      boolean foundJob = false;
-      for (int i = 0; i < caches.size(); i++) {
-        int c = (executingCache + i + 1) % caches.size();
-        if (caches.get(c).hasJob()) {
-          foundJob = true;
-          executingCache = c;
-          break;
-        }
-      }
-
-      if (foundJob) {
-        Cache cache = caches.get(executingCache);
-        currentJob = cache.getJob();
+      // First check if it has a successor:
+      currentJob.getSuccessor().ifPresent(successor -> {
+        currentJob = successor;
         currentJob.start();
-        currentJob.tick();
-      } else {
-        executingCache++;
-      }
+        });
 
-    } else {
-      // Current job is still processing, just tick it.
+      // Next check the regular queue:
+      if (currentJob.isFinished() && !jobQueue.isEmpty()) {
+        currentJob = jobQueue.pop();
+        currentJob.start();
+      }
+    }
+
+    if (!currentJob.isFinished()) {
       currentJob.tick();
     }
+  }
+
+  public static void enqueue(BusJob job) {
+    jobQueue.addLast(job);
   }
 
   public static boolean remoteCacheContains(Cache local, Address address) {
@@ -101,8 +75,7 @@ public class Bus {
 
   public static int numRemoteCachesContaining(Cache local, Address address) {
     /*
-    Note: the long to int cast is safe since there will never be more than int's capacity number of
-    caches.
+       The long to int cast's safe since there will never be more than int.max number of caches.
     */
     return (int)caches.stream()
         .filter(c -> c.getId() != local.getId())
@@ -135,22 +108,13 @@ public class Bus {
    * @param finalState the state the block will be in once it is done being flushed.
    */
   public static void flush(Cache cache, Address address, CoherenceState finalState) {
-    cache.startFlush(); // Make the cache block while flushing if it isn't already blocking.
+    cache.startFlush(address); // Make the cache block while flushing if it isn't already blocking.
     if (!flushing) {
       flushJob = new FlushJob(address);
       flushing = true;
     }
     flushJob.addCacheToFlush(cache, address, finalState);
     stats.incrementFlushes();
-  }
-
-  public static void update(Cache cache, Address address, CoherenceState finalState) {
-    cache.startUpdate(); // Make the cache block while updating if it isn't already blocking.
-    if (!propagatingUpdate) {
-      updateJob = new UpdateJob(address);
-      propagatingUpdate = true;
-    }
-    updateJob.update(cache, address, finalState);
   }
 
   /**
@@ -165,10 +129,10 @@ public class Bus {
   }
 
   public static void reset() {
+    jobQueue.clear();
     caches.clear();
     flushing = false;
-    propagatingUpdate = false;
-    executingCache = 0;
+    currentJob = BusJob.EMPTY_JOB;
     stats.reset();
   }
 }

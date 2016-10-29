@@ -18,14 +18,14 @@ public abstract class CacheBlock {
   public abstract void writeBlock(Address address);
 
   /**
-   * Signal that a BusRd operation has finished for the given address.
+   * Signal that a BusRd operation has isFinished for the given address.
    */
   public abstract void remoteRead(Address address);
 
   /**
-   * Signal that a BusRdX operation has finished for the given address.
+   * Signal that a BusRdX operation has isFinished for the given address.
    */
-  public abstract void remoteReadExclusive(Address address);
+  public abstract void remoteWrite(Address address);
 
   public abstract void remoteUpdate(Address address);
 
@@ -35,7 +35,7 @@ public abstract class CacheBlock {
 
   /**
    * Changes the state of the block to the specified state. Used for updating state after a bus job
-   * is finished. Don't use this method except where it's already used. It performs no checks on the
+   * is isFinished. Don't use this method except where it's already used. It performs no checks on the
    * state transition.
    */
   public void setState(CoherenceState state) {

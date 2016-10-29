@@ -18,7 +18,7 @@ public class CacheSet {
 
   public CacheSet(Cache cache, CacheStatistics stats) {
     this.cache = cache;
-    for (int i = 0; i < CacheProperties.getAssociativity(); i++) {
+    for (int i = 1; i <= CacheProperties.getAssociativity(); i++) {
       this.blocks.put(CoherencePolicy.createStateMachine(cache), 0L);
     }
     this.stats = stats;
@@ -41,7 +41,7 @@ public class CacheSet {
         .findAny();
   }
 
-  public boolean hasAvailableBlock() {
+  public boolean hasUnusedBlock() {
     return blocks.keySet().stream().anyMatch(CacheBlock::isInvalid);
   }
 
@@ -59,7 +59,7 @@ public class CacheSet {
   }
 
   public void read(Address address) {
-    this.incrementSetAge();
+    incrementSetAge();
     stats.incrementReads();
     Optional<CacheBlock> bOpt = getBlockContaining(address);
     if (bOpt.isPresent()) {
@@ -82,7 +82,7 @@ public class CacheSet {
   }
 
   public void write(Address address) {
-    this.incrementSetAge();
+    incrementSetAge();
     stats.incrementWrites();
     Optional<CacheBlock> bOpt = getBlockContaining(address);
     if (bOpt.isPresent()) {
@@ -94,7 +94,7 @@ public class CacheSet {
       if (empty.isPresent()) {
         empty.get().writeBlock(address);
         blocks.put(empty.get(), 0L); // Update the block to be the most recently used.
-        // if (!Bus.remoteCacheContains(cache, address)) {
+        //if (!Bus.remoteCacheContains(cache, address)) {
         stats.incrementWriteMisses();
         //}
       } else {
@@ -104,8 +104,8 @@ public class CacheSet {
     }
   }
 
-  public void remoteReadExclusive(Address address) {
-    getBlockContaining(address).ifPresent(block -> block.remoteReadExclusive(address));
+  public void remoteWrite(Address address) {
+    getBlockContaining(address).ifPresent(block -> block.remoteWrite(address));
   }
 
   public void remoteRead(Address address) {
@@ -117,18 +117,18 @@ public class CacheSet {
   }
 
   public void setState(Address address, CoherenceState state) {
-    Optional<CacheBlock> bOpt = getBlockContaining(address);
-    if (bOpt.isPresent()) {
-      bOpt.get().setState(state);
+    Optional<CacheBlock> optBlock = getBlockContaining(address);
+    if (optBlock.isPresent()) {
+      optBlock.get().setState(state);
     } else {
       // Need to allocate a block. Assume one is available:
-      Optional<CacheBlock> empty = getEmptyBlock();
-      if (empty.isPresent()) {
-        empty.get().setAddress(address);
-        empty.get().setState(state);
+      Optional<CacheBlock> optEmpty = getEmptyBlock();
+      if (optEmpty.isPresent()) {
+        optEmpty.get().setAddress(address);
+        optEmpty.get().setState(state);
       } else {
         Logger.getLogger(getClass().getName())
-            .log(Level.SEVERE, "Attempted to use a new block, but none were available.");
+            .log(Level.SEVERE, "Attempted to set a new block, but none were available.");
       }
     }
   }
@@ -144,25 +144,25 @@ public class CacheSet {
   /**
    * Invalidates the least recently used block and updates the lru information for all blocks.
    */
-  public void evictLru() {
+  public void finishLruEviction() {
     CacheBlock lru = getLru();
     lru.invalidate();
     incrementSetAge();
     blocks.put(lru, 0L);
   }
 
-  public void procEvict(Address address) {
-    /* True if there is no empty block and evicting the LRU block would require (by the coherence
+  public void startEvictionFor(Address address) {
+    /*
+     * True if there is no empty block and evicting the LRU block would require (by the coherence
      * protocol) the data to be flushed to main memory.
      */
-    boolean evictionRequiresFlush = !hasAvailableBlock() && getLru().writeBackOnEvict();
+    boolean evictionRequiresFlush = !hasUnusedBlock() && getLru().writeBackOnEvict();
 
     if (!evictionRequiresFlush) {
-      BusJob job = new BusJob(cache, address, BusAction.EVICTLRU,
-          (Cache local, Address a) -> CoherenceState.I);
-      cache.putJob(job);
+      BusJob job = new BusJob(cache, address, BusAction.EVICTLRU, (local, a) -> CoherenceState.I);
+      cache.setJob(job);
     } else {
-      evictLru();
+      finishLruEviction();
     }
   }
 }

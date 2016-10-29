@@ -1,24 +1,22 @@
 package cache;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 public class CycleCountdown {
-  private final AtomicLong cyclesRemaining;
+  private long cyclesRemaining;
 
   public CycleCountdown(long cycles) {
-    cyclesRemaining = new AtomicLong(cycles);
+    cyclesRemaining = cycles;
   }
 
   /*
-    Decrements and returns the number of cycles remaining.
+   * Decrements and returns the number of cycles remaining.
    */
   public void tick() {
-    if (cyclesRemaining.get() > 0) {
-      cyclesRemaining.decrementAndGet();
+    if (cyclesRemaining > 0) {
+      cyclesRemaining--;
     }
   }
 
-  public boolean finished() {
-    return cyclesRemaining.get() == 0;
+  public boolean isFinished() {
+    return cyclesRemaining == 0L;
   }
 }

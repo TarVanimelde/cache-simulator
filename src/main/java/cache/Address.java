@@ -46,10 +46,10 @@ public class Address {
 
   @Override
   public boolean equals(Object other) {
-      return other instanceof Address && rawAddress == ((Address)other).rawAddress;
+      return other instanceof Address && getTag() == ((Address)other).getTag();
   }
 
   public String toString() {
-    return "raw address: " + rawAddress;
+    return "tag: " + getTag();
   }
 }

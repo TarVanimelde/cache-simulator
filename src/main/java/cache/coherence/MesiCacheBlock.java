@@ -3,10 +3,10 @@ package cache.coherence;
 import bus.Bus;
 import bus.BusAction;
 import bus.BusJob;
+import bus.StateEvaluator;
 import cache.Address;
 import cache.Cache;
 
-import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,7 +17,7 @@ public class MesiCacheBlock extends CacheBlock {
 
   @Override
   public void readBlock(Address address) {
-    switch (this.state) {
+    switch (state) {
       case M:
         // State is not changed by a local read.
         break;
@@ -30,54 +30,64 @@ public class MesiCacheBlock extends CacheBlock {
       case I:
         /*
           The state after reading in the block will depend on whether any other caches hold a copy
-          of the data at the time the job is finished:
+          of the data at the time the job is isFinished:
          */
-        BiFunction<Cache, Address, CoherenceState> finalState = (Cache local, Address a) ->
-            Bus.remoteCacheContains(local, a) ? CoherenceState.S : CoherenceState.E;
+        StateEvaluator finalState = (Cache local, Address a) -> {
+          if (Bus.remoteCacheContains(local, a)) {
+            return CoherenceState.S;
+          } else {
+            return CoherenceState.E;
+          }
+          //Bus.remoteCacheContains(local, a) ? CoherenceState.S : CoherenceState.E;
+        };
 
         BusJob job = new BusJob(cache, address, BusAction.BUSRD, finalState);
-        cache.putJob(job);
+        cache.setJob(job);
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in MESI Read" + this.state);
+            "Invalid state in MESI Read" + state);
         break;
     }
   }
 
   @Override
   public void writeBlock(Address address) {
-    BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX,
-        (Cache local, Address a) ->CoherenceState.M);
-    switch (this.state) {
+    BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX, (local, a) -> CoherenceState.M);
+    switch (state) {
       case M:
         // State is not changed by a local write.
         break;
       case E:
-        this.state = CoherenceState.M;
+        state = CoherenceState.M;
         break;
       case S:
-        cache.putJob(busRdX);
+        // Since this is already in the shared state, no other processor can be in the M state.
+        // Just upgrade this block to M and invalidate the other caches' copies.
+        //Bus.broadcastRemoteWrite(cache, address);
+        //BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX,
+         //   (Cache local, Address a) -> CoherenceState.M);
+        //state = CoherenceState.M;
+        cache.setJob(busRdX);
         break;
       case I:
-        cache.putJob(busRdX);
+        cache.setJob(busRdX);
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in MESI Write" + this.state);
+            "Invalid state in MESI Write" + state);
         break;
     }
   }
 
   @Override
   public void remoteRead(Address address) {
-    switch (this.state) {
+    switch (state) {
       case M:
         Bus.flush(cache, address, CoherenceState.S);
         break;
       case E:
-        //Bus.flush(cache, address, CoherenceState.S);
-        this.state = CoherenceState.S; // TODO
+        state = CoherenceState.S;
         break;
       case S:
         // State is not changed by a remote read.
@@ -87,25 +97,24 @@ public class MesiCacheBlock extends CacheBlock {
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in MESI Remote Read" + this.state);
+            "Invalid state in MESI Remote Read" + state);
         break;
     }
   }
 
   @Override
-  public void remoteReadExclusive(Address address) {
-    switch (this.state) {
+  public void remoteWrite(Address address) {
+    switch (state) {
       case M:
         Bus.flush(cache, address, CoherenceState.I);
         Bus.getStatistics().incrementBusInvalidations();
         break;
       case E:
-        this.state = CoherenceState.I;
+        state = CoherenceState.I;
         Bus.getStatistics().incrementBusInvalidations();
-        //Bus.flush(cache, address, CoherenceState.I); // TODO
         break;
       case S:
-        this.state = CoherenceState.I;
+        state = CoherenceState.I;
         Bus.getStatistics().incrementBusInvalidations();
         break;
       case I:
@@ -113,7 +122,7 @@ public class MesiCacheBlock extends CacheBlock {
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in MESI Remote Write" + this.state);
+            "Invalid state in MESI Remote Write" + state);
         break;
     }
   }
@@ -126,12 +135,11 @@ public class MesiCacheBlock extends CacheBlock {
 
   @Override
   public boolean writeBackOnEvict() {
-    switch (this.state) {
+    switch (state) {
       case M:
         return true;
       case E:
         return false;
-        //return true; // TODO
       case S:
         return false;
       case I:

@@ -131,9 +131,9 @@ public class CacheProperties {
         || cacheSize % blockSize != 0
         || blockSize % WORD_SIZE != 0 // Need caches to be able to hold 32-bit data.
         || (cacheSize / blockSize) % associativity != 0) {
-      String cacheConfig = String.format("Invalid cache configuration: Cache Size: %1$\n" +
-          "Block Size: %2$\n" +
-          "Associativity: %3$", cacheSize, blockSize, associativity);
+      String cacheConfig = String.format("Invalid cache configuration: Cache Size: %d$\n" +
+          "Block Size: %d\n" +
+          "Associativity: %d", cacheSize, blockSize, associativity);
       throw new Exception(cacheConfig);
     }
 

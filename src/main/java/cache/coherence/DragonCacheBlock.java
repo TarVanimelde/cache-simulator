@@ -3,10 +3,10 @@ package cache.coherence;
 import bus.Bus;
 import bus.BusAction;
 import bus.BusJob;
+import bus.StateEvaluator;
 import cache.Address;
 import cache.Cache;
 
-import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,16 +18,16 @@ public class DragonCacheBlock extends CacheBlock {
 
   @Override
   public void readBlock(Address address) {
-    switch (this.state) {
+    switch (state) {
       case I:
         /*
-          The state after reading in the block will depend on whether any other
-          caches hold a copy of the data at the time the job is finished:
+          The state after reading in the block will depend on whether any other caches hold a copy
+          of the data at the time the job is isFinished:
          */
-        BiFunction<Cache, Address, CoherenceState> finalState = (Cache local, Address a) ->
+        StateEvaluator checkOnlyCacheHolding = (Cache local, Address a) ->
             Bus.remoteCacheContains(local, a) ? CoherenceState.SC : CoherenceState.E;
-        BusJob busRd = new BusJob(cache, address, BusAction.BUSRD, finalState);
-        cache.putJob(busRd);
+        BusJob busRd = new BusJob(cache, address, BusAction.BUSRD, checkOnlyCacheHolding);
+        cache.setJob(busRd);
         break;
       case E:
         // State is not changed by a local read.
@@ -43,7 +43,7 @@ public class DragonCacheBlock extends CacheBlock {
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in Dragon Read" + this.state);
+            "Invalid state in Dragon Read" + state);
 
     }
   }
@@ -52,43 +52,49 @@ public class DragonCacheBlock extends CacheBlock {
   public void writeBlock(Address address) {
     /*
       The state after writing to the block will depend on whether any other caches hold a copy of
-      the data at the time the job is finished:
+      the data at the time the job is isFinished:
     */
-    BiFunction<Cache, Address, CoherenceState> finalState = (Cache local, Address a) ->
+    StateEvaluator checkOnlyCacheHolding = (Cache local, Address a) ->
         Bus.remoteCacheContains(local, a) ? CoherenceState.SM : CoherenceState.M;
-    switch (this.state) {
+    switch (state) {
       case I:
-        BusJob busUpdI = new BusJob(cache, address, BusAction.BUSRD, finalState);
-        cache.putJob(busUpdI);
+        /*
+         * First run a BusRd to obtain the data for the cache. Upon completion, immediately send a
+         * BusUpd to inform other caches of the updated word.
+         */
+        BusJob successor = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
+        BusJob read = new BusJob(cache, address, BusAction.BUSRD, (local, a) -> CoherenceState.I,
+            successor);
+        cache.setJob(read);
         break;
       case E:
-          this.state = CoherenceState.M;
+          state = CoherenceState.M;
         break;
       case M:
         // State is not changed by a local update.
         break;
       case SC:
-        BusJob busRdSc = new BusJob(cache, address, BusAction.BUSUPD, finalState);
-        cache.putJob(busRdSc);
+        BusJob busRdSc = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
+        cache.setJob(busRdSc);
         break;
       case SM:
-        BusJob busRdM = new BusJob(cache, address, BusAction.BUSUPD, finalState);
-        cache.putJob(busRdM);
+        BusJob busRdM = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
+        cache.setJob(busRdM);
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in Dragon Write: " + this.state);
+            "Invalid state in Dragon Write: " + state);
     }
   }
 
   @Override
   public void remoteRead(Address address) {
-    switch (this.state) {
+    switch (state) {
       case I:
         // State is not changed by a remote read.
         break;
       case E:
-        this.state = CoherenceState.SC;
+        state = CoherenceState.SC;
         break;
       case M:
         Bus.flush(cache, address, CoherenceState.SM);
@@ -101,19 +107,19 @@ public class DragonCacheBlock extends CacheBlock {
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in Dragon Remote Read: " + this.state);
+            "Invalid state in Dragon Remote Read: " + state);
     }
   }
 
   @Override
-  public void remoteReadExclusive(Address address) {
+  public void remoteWrite(Address address) {
     // This doesn't happen in the dragon protocol. Do you know what happens instead? Updates.
     Logger.getLogger(getClass().getName()).log(Level.SEVERE, "Saw BUSRDX in the Dragon protocol?");
   }
 
   @Override
   public void remoteUpdate(Address address) {
-    switch (this.state) {
+    switch (state) {
       case I:
         // State is not changed by a remote update.
         break;
@@ -128,20 +134,21 @@ public class DragonCacheBlock extends CacheBlock {
             "Saw a remote update in Dragon while in M");
         break;
       case SC:
-        Bus.update(cache, address, CoherenceState.SC);
+        // Saw an update, now the block is updated!.
         break;
       case SM:
-        Bus.update(cache, address, CoherenceState.SM);
+        // Saw an update, now the block is updated!.
+        state = CoherenceState.SC;
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Invalid state in Dragon Remote Update: " + this.state);
+            "Invalid state in Dragon Remote Update: " + state);
     }
   }
 
   @Override
   public boolean writeBackOnEvict() {
-    switch (this.state) {
+    switch (state) {
       case I:
         return false;
       case E:

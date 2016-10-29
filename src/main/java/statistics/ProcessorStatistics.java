@@ -1,6 +1,5 @@
 package statistics;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,18 +17,18 @@ public class ProcessorStatistics {
   /*
     The number of cycles that the processor has run.
    */
-  private final AtomicInteger cycleCount = new AtomicInteger(0);
+  private int cycleCount = 0;
 
-  private final AtomicInteger writeHits = new AtomicInteger(0);
-  private final AtomicInteger writeMisses = new AtomicInteger(0);
-  private final AtomicInteger readHits = new AtomicInteger(0);
-  private final AtomicInteger readMisses = new AtomicInteger(0);
+  private int writeHits = 0;
+  private int writeMisses = 0;
+  private int readHits = 0;
+  private int readMisses = 0;
 
   /**
    * Increases the number of cycles the processor has run by one.
    */
   public void incrementCycles() {
-    cycleCount.incrementAndGet();
+    cycleCount++;
   }
 
   public void attachCacheStats(CacheStatistics l1Stats) {
@@ -46,39 +45,39 @@ public class ProcessorStatistics {
    * Return the number of cycles that the processor has run.
    */
   public int getNumCycles() {
-    return cycleCount.get();
+    return cycleCount;
   }
 
   public void incrementReadHit() {
-    readHits.incrementAndGet();
+    readHits++;
   }
 
   public void incrementReadMiss() {
-    readMisses.incrementAndGet();
+    readMisses++;
   }
 
   public void incrementWriteHit() {
-    writeHits.incrementAndGet();
+    writeHits++;
   }
 
   public void incrementWriteMiss() {
-    writeMisses.incrementAndGet();
+    writeMisses++;
   }
 
   public int getWriteHits() {
-    return writeHits.get();
+    return writeHits;
   }
 
   public int getWriteMisses() {
-    return writeMisses.get();
+    return writeMisses;
   }
 
   public int getReadHits() {
-    return readHits.get();
+    return readHits;
   }
 
   public int getReadMisses() {
-    return readMisses.get();
+    return readMisses;
   }
 
   public int getNumReads() {
@@ -99,11 +98,11 @@ public class ProcessorStatistics {
 
   public ProcessorStatistics combine(ProcessorStatistics other) {
     ProcessorStatistics sum = new ProcessorStatistics();
-    sum.cycleCount.set(Math.max(cycleCount.get(), other.cycleCount.get()));
-    sum.writeHits.set(writeHits.get() + other.writeHits.get());
-    sum.writeMisses.set(writeMisses.get() + other.writeMisses.get());
-    sum.readHits.set(readHits.get() + other.readHits.get());
-    sum.readMisses.set(readMisses.get() + other.readMisses.get());
+    sum.cycleCount = Math.max(cycleCount, other.cycleCount);
+    sum.writeHits = writeHits + other.writeHits;
+    sum.writeMisses = writeMisses + other.writeMisses;
+    sum.readHits = readHits + other.readHits;
+    sum.readMisses = readMisses + other.readMisses;
     // Don't combine cache statistics?
     // TODO
     return sum;

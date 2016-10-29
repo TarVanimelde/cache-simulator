@@ -1,56 +1,53 @@
 package statistics;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-
 public class BusStatistics {
-  private static final AtomicLong bytesWritten = new AtomicLong(0);
-  private static final AtomicInteger busWrites = new AtomicInteger(0);
-  private static final AtomicInteger busReads = new AtomicInteger(0);
-  private static final AtomicInteger busUpdates = new AtomicInteger(0);
-  private static final AtomicInteger flushes = new AtomicInteger(0);
-  private static final AtomicInteger busInvalidations = new AtomicInteger(0);
+  private static long bytesWritten = 0L;
+  private static int busWrites = 0;
+  private static int busReads = 0;
+  private static int busUpdates = 0;
+  private static int flushes = 0;
+  private static int busInvalidations = 0;
 
   public void addBytesWritten(int bytesTransferred) {
-    bytesWritten.addAndGet(bytesTransferred);
+    bytesWritten += bytesTransferred;
   }
 
   public void incrementBusWrites() {
-    busWrites.incrementAndGet();
+    busWrites++;
   }
 
   public void incrementBusReads() {
-    busReads.incrementAndGet();
+    busReads++;
   }
 
   public void incrementBusUpdates() {
-    busUpdates.incrementAndGet();
+    busUpdates++;
   }
 
   public void incrementFlushes() {
-    flushes.incrementAndGet();
+    flushes++;
   }
 
   public int getBusReads() {
-    return busReads.get();
+    return busReads;
   }
 
   public int getBusWrites() {
-    return busWrites.get();
+    return busWrites;
   }
 
   public int getBusUpdates() {
-    return busUpdates.get();
+    return busUpdates;
   }
 
   public int getFlushes() {
-    return flushes.get();
+    return flushes;
   }
 
-  public int getInvalidations() { return busInvalidations.get(); }
+  public int getInvalidations() { return busInvalidations; }
 
   public long getBytesWritten() {
-    return bytesWritten.get();
+    return bytesWritten;
   }
 
   public String toString() {
@@ -63,15 +60,15 @@ public class BusStatistics {
   }
 
   public void reset() {
-    bytesWritten.set(0);
-    busWrites.set(0);
-    busReads.set(0);
-    busUpdates.set(0);
-    flushes.set(0);
-    busInvalidations.set(0);
+    bytesWritten = 0;
+    busWrites = 0;
+    busReads = 0;
+    busUpdates = 0;
+    flushes = 0;
+    busInvalidations = 0;
   }
 
   public void incrementBusInvalidations() {
-    busInvalidations.incrementAndGet();
+    busInvalidations++;
   }
 }

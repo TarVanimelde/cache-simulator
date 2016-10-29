@@ -6,7 +6,7 @@ import cache.CycleCountdown;
 import cache.Address;
 import cache.coherence.CoherenceState;
 
-import java.util.function.BiFunction;
+import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -15,7 +15,7 @@ public class BusJob {
    * An empty job that does nothing. Used as a placeholder.
    */
   public static final BusJob EMPTY_JOB = new BusJob(null, null, BusAction.NONE,
-      (Cache local, Address a) -> CoherenceState.I);
+      (local, a) -> CoherenceState.I);
 
   /*
   The cache being modified (e.g., reading in a block) by the job.
@@ -23,29 +23,39 @@ public class BusJob {
   private final Cache origin; // The cache that spawned the job.
   private final Address target; // The memory address being acted upon.
   private final BusAction action; // The type of bus operation being performed.
-  /**
-   * Given the cache and address, returns the state of the address in that cache. Produces the state
-   * the origin cache's block will be in upon completion given the origin and the address. This
-   * allows external conditions (e.g., whether remote caches hold the same block) to be evaluated
-   * upon completion of the job.
-   */
-  private final BiFunction<Cache, Address, CoherenceState> finalStateEval;
+
+  private final StateEvaluator finalStateEval; // Determines the final state of the calling block.
 
   private boolean started = false; // Indicates whether the job has been started.
   /**
-   * The number of cycles of bus use remaining until the job is finished.
+   * The number of cycles of bus use remaining until the job is isFinished.
    */
-  private CycleCountdown cyclesRemaining;
+  private CycleCountdown cycleCountdown;
+
+  private final BusJob successor;
 
   private int bytesTransferred = 0;
 
-  public BusJob(Cache origin, Address target, BusAction action, BiFunction<Cache, Address,
-      CoherenceState> finalState) {
+  public BusJob(Cache origin, Address target, BusAction action, StateEvaluator finalState) {
     this.origin = origin;
     this.target = target;
     this.action = action;
     this.finalStateEval = finalState;
-    this.cyclesRemaining = new CycleCountdown(0);
+    this.cycleCountdown = new CycleCountdown(0);
+    this.successor = null;
+    if (action == BusAction.NONE) {
+      started = true;
+    }
+  }
+
+  public BusJob(Cache origin, Address target, BusAction action, StateEvaluator finalState,
+                BusJob successorJob) {
+    this.origin = origin;
+    this.target = target;
+    this.action = action;
+    this.finalStateEval = finalState;
+    this.cycleCountdown = new CycleCountdown(0);
+    this.successor = successorJob;
   }
 
   public void start() {
@@ -54,24 +64,25 @@ public class BusJob {
         case BUSRD:
           // fall through, do the same as in BUSRDX:
         case BUSRDX:
+          bytesTransferred = CacheProperties.getBlockSize();
           if (Bus.remoteCacheContains(origin, target)) {
             // At least one cache contains the block, get it from a cache:
-            int numRemote = Bus.numRemoteCachesContaining(origin, target);
-            bytesTransferred = CacheProperties.getBlockSize() * numRemote;
-            cyclesRemaining = new CycleCountdown(CacheProperties.getWordsPerBlock() * numRemote);
+            //int numRemote = Bus.numRemoteCachesContaining(origin, target);
+            //bytesTransferred = CacheProperties.getBlockSize() * numRemote;
+            cycleCountdown = new CycleCountdown(CacheProperties.getWordsPerBlock());// * numRemote);
           } else {
             // The block is not cached: read, it from main memory:
-            bytesTransferred = CacheProperties.getBlockSize();
-            cyclesRemaining = new CycleCountdown(Bus.READ_FROM_MEM);
+            cycleCountdown = new CycleCountdown(Bus.READ_FROM_MEM_CYCLES);
           }
           break;
         case BUSUPD:
           bytesTransferred = CacheProperties.WORD_SIZE;
-          cyclesRemaining = new CycleCountdown(Bus.READ_WORD);
+          cycleCountdown = new CycleCountdown(Bus.READ_WORD_CYCLES);
           break;
         case EVICTLRU:
           bytesTransferred = CacheProperties.getBlockSize();
-          cyclesRemaining = new CycleCountdown(Bus.WRITE_TO_MEM);
+          cycleCountdown = new CycleCountdown(Bus.WRITE_TO_MEM_CYCLES);
+          break;
         case NONE:
           // Do nothing.
           break;
@@ -84,44 +95,41 @@ public class BusJob {
 
   public void tick() {
     if (!isFinished()) {
-      cyclesRemaining.tick();
-      if (isFinished() && action != BusAction.NONE) {
+      cycleCountdown.tick();
+      if (isFinished()) {
         onFinish();
       }
     }
   }
 
-  /**
-   *
-   * @return The number of bytes transferred from the origin over the bus by this job.
-   */
-  public int getBytesTransferred() {
-    return bytesTransferred;
+  public Optional<BusJob> getSuccessor() {
+    return Optional.ofNullable(successor);
   }
 
   public boolean isFinished() {
-    return cyclesRemaining.finished();
+    return started && cycleCountdown.isFinished();
   }
 
   private void onFinish() {
-    if (isFinished() && action != BusAction.NONE) {
+    if (isFinished()) {
+      Bus.getStatistics().addBytesWritten(bytesTransferred);
       switch (action) {
         case EVICTLRU:
           origin.finishEvictionFor(target);
           break;
         case BUSRDX:
-          origin.setState(target, finalStateEval.apply(origin, target));
           Bus.broadcastRemoteWrite(origin, target);
+          origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusWrites();
           break;
         case BUSRD:
-          origin.setState(target, finalStateEval.apply(origin, target));
           Bus.broadcastRemoteRead(origin, target);
+          origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusReads();
           break;
         case BUSUPD:
-          origin.setState(target, finalStateEval.apply(origin, target));
           Bus.broadcastRemoteUpdate(origin, target);
+          origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusUpdates();
           break;
         default:
@@ -130,7 +138,7 @@ public class BusJob {
               .log(Level.WARNING, "Did not handle bus job final case for" + action.toString());
           break;
       }
-      origin.setJobFinished();
     }
   }
+  // TODO: write latency :<
 }

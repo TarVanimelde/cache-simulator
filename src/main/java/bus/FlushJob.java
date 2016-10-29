@@ -35,13 +35,14 @@ public class FlushJob {
         // Done, set the states of all the cache blocks:
         stateOnFinish.entrySet()
             .forEach(entry -> entry.getKey().finishFlush(address, entry.getValue()));
+        Bus.getStatistics().addBytesWritten(CacheProperties.getBlockSize());
       }
     }
   }
 
   private void start() {
     if (!started) {
-      cycleCountdown = new CycleCountdown(Bus.WRITE_TO_MEM * stateOnFinish.entrySet().size());
+      cycleCountdown = new CycleCountdown(Bus.WRITE_TO_MEM_CYCLES);
       started = true;
     }
   }
@@ -56,15 +57,7 @@ public class FlushJob {
     }
   }
 
-  /**
-   * The number of bytes transferred over the bus is the number of caches that flush times the
-   * number of cycles it takes for one cache to flush a block to memory.
-   */
-  public int getBytesTransferred() {
-    return CacheProperties.getBlockSize() * stateOnFinish.entrySet().size();
-  }
-
   public boolean finished() {
-    return cycleCountdown.finished();
+    return cycleCountdown.isFinished();
   }
 }
