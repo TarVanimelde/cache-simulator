@@ -112,7 +112,7 @@ public class ProcessorStatistics {
     return (cacheStatsAttached ?
             l1Stats.toString() + "\n" : "")
         + "Cycles: " + getNumCycles()
-        + "\nData miss rate: " + getDataMissRate();
+        + "\nData miss rate: " + String.format("%.8f", getDataMissRate());
   }
 
 }

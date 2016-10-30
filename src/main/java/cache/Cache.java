@@ -56,7 +56,7 @@ public class Cache {
   public void remoteUpdate(Address address) { getSet(address).remoteUpdate(address); }
 
   public boolean isBlocking() {
-    return !busJob.isFinished() || isFlushing;
+    return !busJob.isFinished() || !busJob.successorFinished() || isFlushing;
   }
 
   /**

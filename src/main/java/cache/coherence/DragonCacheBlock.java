@@ -123,21 +123,11 @@ public class DragonCacheBlock extends CacheBlock {
       case I:
         // State is not changed by a remote update.
         break;
-      case E:
-        // A remote update cannot happen in E state:
-        Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Saw a remote update in Dragon while in E");
-        break;
-      case M:
-        // A remote update cannot happen in M state:
-        Logger.getLogger(getClass().getName()).log(Level.SEVERE,
-            "Saw a remote update in Dragon while in M");
-        break;
       case SC:
-        // Saw an update, now the block is updated!.
+        // Saw an update, now the block is updated! State is not changed by a remote update.
         break;
       case SM:
-        // Saw an update, now the block is updated!.
+        // Saw an update, now the block is updated!
         state = CoherenceState.SC;
         break;
       default:

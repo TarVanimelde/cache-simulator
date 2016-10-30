@@ -102,12 +102,20 @@ public class BusJob {
     }
   }
 
+  public boolean hasSuccessor() {
+    return getSuccessor().isPresent();
+  }
+
   public Optional<BusJob> getSuccessor() {
     return Optional.ofNullable(successor);
   }
 
   public boolean isFinished() {
     return started && cycleCountdown.isFinished();
+  }
+
+  public boolean successorFinished() {
+    return isFinished() && (!hasSuccessor() || successor.isFinished());
   }
 
   private void onFinish() {

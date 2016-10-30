@@ -28,7 +28,7 @@ public class Program {
     Logger.getLogger(Program.class.getName()).log(Level.INFO, "Setting the cache configuration.");
     CoherencePolicy policy = CoherencePolicy.MSI;
     int cacheSize = 4096;
-    int blockSize = 16;
+    int blockSize = 128;
     int associativity = 2;
     CacheProperties.setCoherencePolicy(policy);
     try {
@@ -40,8 +40,8 @@ public class Program {
     }
 
     //String base = "/Users/TarVanimelde1/Desktop/CS4223/A2/blackscholes/blackscholes_";
-    String base = "/Users/TarVanimelde1/Desktop/CS4223/A2/bodytrack/bodytrack_";
-    //String base = "/Users/TarVanimelde1/Desktop/CS4223/A2/fluidanimate/fluidanimate_";
+    //String base = "/Users/TarVanimelde1/Desktop/CS4223/A2/bodytrack/bodytrack_";
+    String base = "/Users/TarVanimelde1/Desktop/CS4223/A2/fluidanimate/fluidanimate_";
     List<List<Instruction>> instructions = new ArrayList<>();
     for (int i = 0; i <= 3; i++) {
       String p = base + i + ".data";
