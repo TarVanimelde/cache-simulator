@@ -24,6 +24,8 @@ public class BusJob {
   private final Address target; // The memory address being acted upon.
   private final BusAction action; // The type of bus operation being performed.
 
+  private int startedAtCycle = -1; // The cycle of the bus in which the job was started.
+
   private final StateEvaluator finalStateEval; // Determines the final state of the calling block.
 
   private boolean started = false; // Indicates whether the job has been started.
@@ -59,6 +61,8 @@ public class BusJob {
   }
 
   public void start() {
+    startedAtCycle = Bus.getCycle();
+
     if (!started) {
       switch (action) {
         case BUSRD:
@@ -94,6 +98,10 @@ public class BusJob {
   }
 
   public void tick() {
+    if (!started) {
+      start();
+    }
+
     if (!isFinished()) {
       cycleCountdown.tick();
       if (isFinished()) {
@@ -102,7 +110,7 @@ public class BusJob {
     }
   }
 
-  public boolean hasSuccessor() {
+  private boolean hasSuccessor() {
     return getSuccessor().isPresent();
   }
 
@@ -129,6 +137,7 @@ public class BusJob {
           Bus.broadcastRemoteWrite(origin, target);
           origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusWrites();
+          Bus.getStatistics().addWriteLatency(Bus.getCycle() - startedAtCycle);
           break;
         case BUSRD:
           Bus.broadcastRemoteRead(origin, target);
@@ -139,6 +148,7 @@ public class BusJob {
           Bus.broadcastRemoteUpdate(origin, target);
           origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusUpdates();
+          Bus.getStatistics().addWriteLatency(Bus.getCycle() - startedAtCycle);
           break;
         default:
           // All cases should be enumerated above, log the action:
@@ -148,5 +158,4 @@ public class BusJob {
       }
     }
   }
-  // TODO: write latency :<
 }

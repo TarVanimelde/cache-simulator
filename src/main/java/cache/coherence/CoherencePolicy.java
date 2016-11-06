@@ -7,14 +7,13 @@ import cache.CacheProperties;
 public enum CoherencePolicy {
   MSI,
   MESI,
-  MESIF,
   DRAGON;
 
-  public static CacheBlock createStateMachine(Cache cache) {
-    return createStateMachine(cache, new Address(-1));
+  public static CacheBlock createBlock(Cache cache) {
+    return createBlock(cache, new Address(-1));
   }
 
-  public static CacheBlock createStateMachine(Cache cache, Address address) {
+  public static CacheBlock createBlock(Cache cache, Address address) {
     switch (CacheProperties.getCoherencePolicy()) {
       case MSI:
         return new MsiCacheBlock(cache, address);

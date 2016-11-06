@@ -108,6 +108,7 @@ public class ProcessorStatistics {
     return sum;
   }
 
+  @Override
   public String toString() {
     return (cacheStatsAttached ?
             l1Stats.toString() + "\n" : "")

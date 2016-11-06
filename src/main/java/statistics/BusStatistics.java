@@ -7,6 +7,8 @@ public class BusStatistics {
   private static int busUpdates = 0;
   private static int flushes = 0;
   private static int busInvalidations = 0;
+  private static int numWrites = 0;
+  private static long writeLatencies = 0;
 
   public void addBytesWritten(int bytesTransferred) {
     bytesWritten += bytesTransferred;
@@ -50,13 +52,19 @@ public class BusStatistics {
     return bytesWritten;
   }
 
+  public long getAverageWriteLatency() {
+    return writeLatencies / ((long)getBusWrites() + getBusUpdates());
+  }
+
+  @Override
   public String toString() {
     return "Bytes transferred on bus: " + getBytesWritten()
         + "\nBus reads: " +  getBusReads()
         + "\nBus writes: " + getBusWrites()
         + "\nBus updates: " + getBusUpdates()
         + "\nBus flushes: " + getFlushes()
-        + "\nBus invalidations: " + getInvalidations();
+        + "\nBus invalidations: " + getInvalidations()
+        + "\nAverage write latency: " + getAverageWriteLatency();
   }
 
   public void reset() {
@@ -70,5 +78,10 @@ public class BusStatistics {
 
   public void incrementBusInvalidations() {
     busInvalidations++;
+  }
+
+  public void addWriteLatency(int writeLatency) {
+    numWrites++;
+    writeLatencies += writeLatency;
   }
 }

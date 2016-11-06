@@ -3,7 +3,6 @@ package cache;
 import bus.BusAction;
 import bus.BusJob;
 import cache.coherence.*;
-import statistics.CacheStatistics;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -14,14 +13,12 @@ import java.util.logging.Logger;
 public class CacheSet {
   private final Cache cache; // A reference to the cache that owns this set.
   private final Map<CacheBlock, Long> blocks = new HashMap<>(); // Mapping to recency of access.
-  private final CacheStatistics stats; // The statistics aggregator to report read/write info to.
 
-  public CacheSet(Cache cache, CacheStatistics stats) {
+  public CacheSet(Cache cache) {
     this.cache = cache;
     for (int i = 1; i <= CacheProperties.getAssociativity(); i++) {
-      this.blocks.put(CoherencePolicy.createStateMachine(cache), 0L);
+      this.blocks.put(CoherencePolicy.createBlock(cache), 0L);
     }
-    this.stats = stats;
   }
 
   /**
@@ -54,13 +51,12 @@ public class CacheSet {
   /*
    * Increments the time since last accessed for all blocks in the set.
    */
-  private void incrementSetAge() {
+  private void updateLRU() {
     blocks.keySet().forEach(block -> blocks.merge(block, 1L, (oldValue, one) -> oldValue + one));
   }
 
   public void read(Address address) {
-    incrementSetAge();
-    stats.incrementReads();
+    updateLRU();
     Optional<CacheBlock> bOpt = getBlockContaining(address);
     if (bOpt.isPresent()) {
       CacheBlock target = bOpt.get();
@@ -72,7 +68,6 @@ public class CacheSet {
         empty.get().readBlock(address);
         blocks.put(empty.get(), 0L); // Update the block to be the most recently used.
         //if (!Bus.remoteCacheContains(cache, address)) {
-        stats.incrementReadMisses();
         //}
       } else {
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
@@ -82,8 +77,7 @@ public class CacheSet {
   }
 
   public void write(Address address) {
-    incrementSetAge();
-    stats.incrementWrites();
+    updateLRU();
     Optional<CacheBlock> bOpt = getBlockContaining(address);
     if (bOpt.isPresent()) {
       CacheBlock target = bOpt.get();
@@ -95,7 +89,6 @@ public class CacheSet {
         empty.get().writeBlock(address);
         blocks.put(empty.get(), 0L); // Update the block to be the most recently used.
         //if (!Bus.remoteCacheContains(cache, address)) {
-        stats.incrementWriteMisses();
         //}
       } else {
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
@@ -147,7 +140,7 @@ public class CacheSet {
   public void finishLruEviction() {
     CacheBlock lru = getLru();
     lru.invalidate();
-    incrementSetAge();
+    updateLRU();
     blocks.put(lru, 0L);
   }
 

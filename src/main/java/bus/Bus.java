@@ -28,6 +28,8 @@ public class Bus {
   private static boolean flushing = false; // Is the bus currently being used to flush to memory?
   private static FlushJob flushJob;
 
+  private static int cycleCounter = 0;
+
   /*
    * The number of cycles it takes to perform certain actions over the bus:
    */
@@ -42,6 +44,7 @@ public class Bus {
       if (flushJob.finished()) {
         flushing = false;
       }
+      cycleCounter++;
       return;
     }
 
@@ -63,6 +66,8 @@ public class Bus {
     if (!currentJob.isFinished()) {
       currentJob.tick();
     }
+
+    cycleCounter++;
   }
 
   public static void enqueue(BusJob job) {
@@ -73,7 +78,7 @@ public class Bus {
     return numRemoteCachesContaining(local, address) > 0;
   }
 
-  public static int numRemoteCachesContaining(Cache local, Address address) {
+  private static int numRemoteCachesContaining(Cache local, Address address) {
     /*
        The long to int cast's safe since there will never be more than int.max number of caches.
     */
@@ -128,11 +133,16 @@ public class Bus {
     return stats;
   }
 
+  public static int getCycle() {
+    return cycleCounter;
+  }
+
   public static void reset() {
     jobQueue.clear();
     caches.clear();
     flushing = false;
     currentJob = BusJob.EMPTY_JOB;
+    cycleCounter = 0;
     stats.reset();
   }
 }

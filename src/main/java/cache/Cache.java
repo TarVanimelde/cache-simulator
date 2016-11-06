@@ -31,7 +31,7 @@ public class Cache {
     int numSets = CacheProperties.getNumSets();
     this.sets = new ArrayList<>(numSets);
     for (int i = 0; i < CacheProperties.getNumSets(); i++) {
-      sets.add(new CacheSet(this, stats));
+      sets.add(new CacheSet(this));
     }
   }
 
