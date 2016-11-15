@@ -7,6 +7,7 @@ import cache.CacheProperties;
 public enum CoherencePolicy {
   MSI,
   MESI,
+  MUSI,
   DRAGON;
 
   public static CacheBlock createBlock(Cache cache) {
@@ -17,6 +18,8 @@ public enum CoherencePolicy {
     switch (CacheProperties.getCoherencePolicy()) {
       case MSI:
         return new MsiCacheBlock(cache, address);
+      case MUSI:
+        return new MusiCacheBlock(cache, address);
       case MESI:
         return new MesiCacheBlock(cache, address);
       case DRAGON:

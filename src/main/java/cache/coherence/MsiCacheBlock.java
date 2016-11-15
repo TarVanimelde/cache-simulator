@@ -40,6 +40,7 @@ public class MsiCacheBlock extends CacheBlock {
     switch (state) {
       case M:
         // State is not changed by a local write.
+        Bus.getStatistics().addWriteLatency(0);
         break;
       case S:
         // Since this is already in the shared state, no other processor can be in the M state.
@@ -115,5 +116,10 @@ public class MsiCacheBlock extends CacheBlock {
       default:
         return false;
     }
+  }
+
+  @Override
+  public boolean isShared() {
+    return state == CoherenceState.S;
   }
 }

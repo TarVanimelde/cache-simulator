@@ -29,13 +29,15 @@ public abstract class CacheBlock {
 
   public abstract void remoteUpdate(Address address);
 
+  public abstract boolean isShared();
+
   public boolean isInvalid() {
     return state == CoherenceState.I;
   }
 
   /**
    * Changes the state of the block to the specified state. Used for updating state after a bus job
-   * is isFinished. Don't use this method except where it's already used. It performs no checks on the
+   * is finished. Don't use this method except where it's already used. It performs no checks on the
    * state transition.
    */
   public void setState(CoherenceState state) {
@@ -58,5 +60,9 @@ public abstract class CacheBlock {
   public boolean contains(Address address) {
     return this.state != CoherenceState.I
         && address.getTag() == this.address.getTag();
+  }
+
+  public String toString() {
+    return "Cache: " + cache.getId() + ", Address tag: " + address.getTag() + ", State: " + state;
   }
 }

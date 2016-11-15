@@ -7,7 +7,7 @@ public interface CLIModel {
   @Option(
       shortName="f",
       longName="files",
-      description="The memory traces to run a cache simulation of."
+      description="The traces or directory of traces to simulate."
   )
   public List<String> getFiles();
 
@@ -41,7 +41,20 @@ public interface CLIModel {
       defaultValue="MSI",
       longName = "policy",
       shortName = "p",
-      description = "The coherence strategy being followed by the cache."
+      description = "The coherence strategies to sequentially simulate the traces with."
   )
-  public CoherencePolicy getPolicy();
+  public List<CoherencePolicy> getPolicies();
+
+  @Option(
+      helpRequest = true,
+      description = "Display help and exit.",
+      shortName = "h")
+  public boolean isHelp();
+
+
+  @Option(
+      longName = "silent",
+      description = "Only prints severe logs and simulation results to console.",
+      shortName = "s")
+  public boolean isSilent();
 }

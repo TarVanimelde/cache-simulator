@@ -7,7 +7,7 @@ public class BusStatistics {
   private static int busUpdates = 0;
   private static int flushes = 0;
   private static int busInvalidations = 0;
-  private static int numWrites = 0;
+  private static long numWrites = 0;
   private static long writeLatencies = 0;
 
   public void addBytesWritten(int bytesTransferred) {
@@ -53,7 +53,7 @@ public class BusStatistics {
   }
 
   public long getAverageWriteLatency() {
-    return writeLatencies / ((long)getBusWrites() + getBusUpdates());
+    return writeLatencies / numWrites;//((long)getBusWrites() + getBusUpdates());
   }
 
   @Override
@@ -74,6 +74,8 @@ public class BusStatistics {
     busUpdates = 0;
     flushes = 0;
     busInvalidations = 0;
+    numWrites = 0;
+    writeLatencies = 0;
   }
 
   public void incrementBusInvalidations() {

@@ -23,7 +23,15 @@ public class CycleCountdown {
     }
   }
 
+  public long getCyclesRemaining() {
+    return cyclesRemaining;
+  }
+
   public boolean isFinished() {
     return cyclesRemaining <= 0L;
+  }
+
+  public String toString() {
+    return "Cycles remaining: " + cyclesRemaining;
   }
 }

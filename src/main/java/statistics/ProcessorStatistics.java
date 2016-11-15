@@ -1,18 +1,11 @@
 package statistics;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 /**
  * Processor-level statistics accumulator.
  */
 public class ProcessorStatistics {
 
-  private CacheStatistics l1Stats;
-  /**
-   * Have the statistics for a cache been added to this processor statistics accumulator?
-   */
-  private boolean cacheStatsAttached = false;
+  private final int id;
 
   /*
     The number of cycles that the processor has run.
@@ -24,21 +17,43 @@ public class ProcessorStatistics {
   private int readHits = 0;
   private int readMisses = 0;
 
+  private int privateAccesses = 0;
+  private int sharedAccesses = 0;
+
+  public ProcessorStatistics() {
+    this.id = -1;
+  }
+
+  public ProcessorStatistics(int id) {
+    this.id = id;
+  }
+
+
+  public int getId() {
+    return id;
+  }
+
+  public void incrementPrivateAccesses() {
+    privateAccesses++;
+  }
+
+  public void incrementSharedAccesses() {
+    sharedAccesses++;
+  }
+
+  public int getPrivateAccesses() {
+    return privateAccesses;
+  }
+
+  public int getSharedAccesses() {
+    return sharedAccesses;
+  }
+
   /**
    * Increases the number of cycles the processor has run by one.
    */
   public void incrementCycles() {
     cycleCount++;
-  }
-
-  public void attachCacheStats(CacheStatistics l1Stats) {
-    if (!cacheStatsAttached) {
-      this.l1Stats = l1Stats;
-      cacheStatsAttached = true;
-    } else {
-      Logger.getLogger(ProcessorStatistics.class.getName()).log(Level.WARNING,
-          "Tried to attach more than one cache statistics to a processor's statistics.");
-    }
   }
 
   /**
@@ -103,17 +118,18 @@ public class ProcessorStatistics {
     sum.writeMisses = writeMisses + other.writeMisses;
     sum.readHits = readHits + other.readHits;
     sum.readMisses = readMisses + other.readMisses;
-    // Don't combine cache statistics?
-    // TODO
+    sum.privateAccesses = privateAccesses + other.privateAccesses;
+    sum.sharedAccesses = sharedAccesses + other.sharedAccesses;
+
     return sum;
   }
 
   @Override
   public String toString() {
-    return (cacheStatsAttached ?
-            l1Stats.toString() + "\n" : "")
-        + "Cycles: " + getNumCycles()
-        + "\nData miss rate: " + String.format("%.8f", getDataMissRate());
+    return "Cycles: " + getNumCycles()
+        + "\nData miss rate: " + String.format("%.8f", getDataMissRate())
+        + "\nShared accesses: " + getSharedAccesses()
+        + "\nPrivate accesses: " + getPrivateAccesses();
   }
 
 }

@@ -21,4 +21,9 @@ public class Instruction {
   public long getValue() {
         return this.value;
     }
+
+  @Override
+  public String toString() {
+    return String.join(", ", "Instruction type: " + type, "Value: " + value);
+  }
 }

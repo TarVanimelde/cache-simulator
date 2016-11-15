@@ -3,6 +3,7 @@ package cache;
 import bus.BusAction;
 import bus.BusJob;
 import cache.coherence.*;
+import statistics.ProcessorStatistics;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -61,14 +62,17 @@ public class CacheSet {
     if (bOpt.isPresent()) {
       CacheBlock target = bOpt.get();
       target.readBlock(address);
+      if (target.isShared()) {
+        cache.getStatistics().incrementSharedAccesses();
+      } else {
+        cache.getStatistics().incrementPrivateAccesses();
+      }
       blocks.put(target, 0L); // Update the block to be the most recently used.
     } else {
       Optional<CacheBlock> empty = getEmptyBlock();
       if (empty.isPresent()) {
         empty.get().readBlock(address);
         blocks.put(empty.get(), 0L); // Update the block to be the most recently used.
-        //if (!Bus.remoteCacheContains(cache, address)) {
-        //}
       } else {
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
             "Could not find an empty block to read to.");
@@ -81,6 +85,11 @@ public class CacheSet {
     Optional<CacheBlock> bOpt = getBlockContaining(address);
     if (bOpt.isPresent()) {
       CacheBlock target = bOpt.get();
+      if (target.isShared()) {
+        cache.getStatistics().incrementSharedAccesses();
+      } else {
+        cache.getStatistics().incrementPrivateAccesses();
+      }
       target.writeBlock(address);
       blocks.put(target, 0L); // Update the block to be the most recently used.
     } else {
@@ -88,8 +97,6 @@ public class CacheSet {
       if (empty.isPresent()) {
         empty.get().writeBlock(address);
         blocks.put(empty.get(), 0L); // Update the block to be the most recently used.
-        //if (!Bus.remoteCacheContains(cache, address)) {
-        //}
       } else {
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
             "Could not find an empty block to write to.");

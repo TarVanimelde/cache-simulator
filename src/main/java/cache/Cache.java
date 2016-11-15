@@ -3,7 +3,7 @@ package cache;
 import bus.Bus;
 import bus.BusJob;
 import cache.coherence.CoherenceState;
-import statistics.CacheStatistics;
+import statistics.ProcessorStatistics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 public class Cache {
 
-  private final CacheStatistics stats;
+  private final ProcessorStatistics stats;
 
   private List<CacheSet> sets; // The cache blocks, organized into sets.
 
@@ -23,16 +23,20 @@ public class Cache {
   private final int id; // The unique cache ID.
   private static int idGenerator = 0; // A cache ID generator.
 
-  public Cache() {
+  public Cache(ProcessorStatistics statistics) {
     this.id = idGenerator;
     idGenerator++;
-    stats = new CacheStatistics(id);
+    this.stats = statistics;
 
     int numSets = CacheProperties.getNumSets();
     this.sets = new ArrayList<>(numSets);
     for (int i = 0; i < CacheProperties.getNumSets(); i++) {
       sets.add(new CacheSet(this));
     }
+  }
+
+  public static void reset() {
+    idGenerator = 0;
   }
 
   public int getId() {
@@ -128,7 +132,12 @@ public class Cache {
     isFlushing = false;
   }
 
-  public CacheStatistics getStatistics() {
+  public ProcessorStatistics getStatistics() {
     return stats;
+  }
+
+  @Override
+  public String toString() {
+    return "ID: " + id;
   }
 }

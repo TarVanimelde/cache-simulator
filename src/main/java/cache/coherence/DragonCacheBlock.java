@@ -68,10 +68,12 @@ public class DragonCacheBlock extends CacheBlock {
         cache.setJob(read);
         break;
       case E:
-          state = CoherenceState.M;
+        state = CoherenceState.M;
+        Bus.getStatistics().addWriteLatency(0);
         break;
       case M:
         // State is not changed by a local update.
+        Bus.getStatistics().addWriteLatency(0);
         break;
       case SC:
         BusJob busRdSc = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
@@ -124,10 +126,10 @@ public class DragonCacheBlock extends CacheBlock {
         // State is not changed by a remote update.
         break;
       case SC:
-        // Saw an update, now the block is updated! State is not changed by a remote update.
+        // Saw an update, now this block is updated! State is not changed by a remote update.
         break;
       case SM:
-        // Saw an update, now the block is updated!
+        // Saw an update, now this block is updated!
         state = CoherenceState.SC;
         break;
       default:
@@ -152,5 +154,10 @@ public class DragonCacheBlock extends CacheBlock {
       default:
         return false;
     }
+  }
+
+  @Override
+  public boolean isShared() {
+    return state == CoherenceState.SC || state == CoherenceState.SM;
   }
 }

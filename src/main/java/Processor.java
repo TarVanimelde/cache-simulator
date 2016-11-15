@@ -10,38 +10,46 @@ import java.util.Deque;
 import java.util.List;
 
 public class Processor {
-
   private Cache l1; // The processor's cache.
 
-  private CycleCountdown nonmemInstr = new CycleCountdown(0); // A timer to wait out the cycles of an OTHER inst.
+  private CycleCountdown nonmemCountdown = new CycleCountdown(0); // A timer to wait out the cycles of an OTHER inst.
   private final Deque<Instruction> instructions; // The sequence of instructions to carry out.
 
-  private ProcessorStatistics stats = new ProcessorStatistics();
+  private final int id; // The unique processor ID.
+  private static int idCounter = 0; // A processor ID counter.
+  private final ProcessorStatistics stats;
 
   public Processor(List<Instruction> instructions) {
-    l1 = new Cache();
+    this.id = idCounter; // The unique processor ID.
+    stats = new ProcessorStatistics(id);
+    idCounter++;
+
+    l1 = new Cache(stats);
     Bus.add(l1);
-    stats.attachCacheStats(l1.getStatistics());
     this.instructions = new ArrayDeque<>(instructions);
+  }
+
+  public static void reset() {
+    idCounter = 0;
+    Cache.reset();
   }
 
 
   public void tick() {
-    // Only do a cycle if there is work left:
-    if (!nonmemInstr.isFinished()) {
-      nonmemInstr.tick();
+    if (!nonmemCountdown.isFinished()) {
+      nonmemCountdown.tick();
       stats.incrementCycles();
     } else if (hasInstructionsRemaining() && !l1.isBlocking()) {
       Instruction instr = instructions.peek();
       Address address = new Address((int)instr.getValue());
       switch (instr.getType()) {
         case OTHER:
-          nonmemInstr = new CycleCountdown(instr.getValue());
+          nonmemCountdown = new CycleCountdown(instr.getValue());
           instructions.pop();
           break;
         case LOAD:
           if (!l1.contains(address) && !l1.hasBlockAvailableFor(address)) {
-            // Need to startEvictionFor a block before loading the address, do that now:
+            // Need to evict a block before loading the address, do that now:
             l1.allocateBlockFor(address);
           } else {
             if (l1.contains(address)) {
@@ -56,7 +64,7 @@ public class Processor {
           break;
         case STORE:
           if (!l1.contains(address) && !l1.hasBlockAvailableFor(address)) {
-            // Need to startEvictionFor a block before storing the address, do that now:
+            // Need to evict a block before storing the address, do that now:
             l1.allocateBlockFor(address);
           } else {
             if (l1.contains(address)) {
@@ -84,14 +92,22 @@ public class Processor {
   public boolean isFinished() {
     return !hasInstructionsRemaining()
         && !l1.isBlocking()
-        && nonmemInstr.isFinished();
+        && nonmemCountdown.isFinished();
   }
 
-  public boolean hasInstructionsRemaining() {
+  private boolean hasInstructionsRemaining() {
     return !instructions.isEmpty();
   }
 
   public ProcessorStatistics getStatistics() {
     return stats;
+  }
+
+  @Override
+  public String toString() {
+    return String.join(", ",
+        "Processor ID: " + id,
+        "Current cycle: " + stats.getNumCycles(),
+        "Finished? " + isFinished());
   }
 }

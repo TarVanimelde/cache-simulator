@@ -48,6 +48,7 @@ public class BusJob {
     if (action == BusAction.NONE) {
       started = true;
     }
+    startedAtCycle = Bus.getCycle();
   }
 
   public BusJob(Cache origin, Address target, BusAction action, StateEvaluator finalState,
@@ -58,21 +59,26 @@ public class BusJob {
     this.finalStateEval = finalState;
     this.cycleCountdown = new CycleCountdown(0);
     this.successor = successorJob;
+    this.startedAtCycle = Bus.getCycle();
   }
 
   public void start() {
-    startedAtCycle = Bus.getCycle();
-
     if (!started) {
       switch (action) {
         case BUSRD:
-          // fall through, do the same as in BUSRDX:
+          bytesTransferred = CacheProperties.getBlockSize();
+          if (Bus.remoteCacheContains(origin, target)) {
+            // At least one cache contains the block, get it from a cache:
+            cycleCountdown = new CycleCountdown(CacheProperties.getWordsPerBlock());
+          } else {
+            // The block is not cached: read, it from main memory:
+            cycleCountdown = new CycleCountdown(Bus.READ_FROM_MEM_CYCLES);
+          }
+          break;
         case BUSRDX:
           bytesTransferred = CacheProperties.getBlockSize();
           if (Bus.remoteCacheContains(origin, target)) {
             // At least one cache contains the block, get it from a cache:
-            //int numRemote = Bus.numRemoteCachesContaining(origin, target);
-            //bytesTransferred = CacheProperties.getBlockSize() * numRemote;
             cycleCountdown = new CycleCountdown(CacheProperties.getWordsPerBlock());// * numRemote);
           } else {
             // The block is not cached: read, it from main memory:
@@ -137,7 +143,7 @@ public class BusJob {
           Bus.broadcastRemoteWrite(origin, target);
           origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusWrites();
-          Bus.getStatistics().addWriteLatency(Bus.getCycle() - startedAtCycle);
+          Bus.getStatistics().addWriteLatency(Bus.getCycle() - startedAtCycle + 1);
           break;
         case BUSRD:
           Bus.broadcastRemoteRead(origin, target);
@@ -148,7 +154,7 @@ public class BusJob {
           Bus.broadcastRemoteUpdate(origin, target);
           origin.setState(target, finalStateEval.apply(origin, target));
           Bus.getStatistics().incrementBusUpdates();
-          Bus.getStatistics().addWriteLatency(Bus.getCycle() - startedAtCycle);
+          Bus.getStatistics().addWriteLatency(Bus.getCycle() - startedAtCycle + 1);
           break;
         default:
           // All cases should be enumerated above, log the action:
@@ -157,5 +163,9 @@ public class BusJob {
           break;
       }
     }
+  }
+
+  public String toString() {
+    return "From cache: " + origin.getId() + ", Job: " + action;
   }
 }

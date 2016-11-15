@@ -1,4 +1,5 @@
 import bus.Bus;
+import com.lexicalscope.jewel.cli.ArgumentValidationException;
 import com.lexicalscope.jewel.cli.CliFactory;
 import statistics.BusStatistics;
 import cache.*;
@@ -10,9 +11,9 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
 import java.util.ArrayList;
-
-
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,8 +21,28 @@ import java.util.stream.Collectors;
 
 public class Program {
   public static void main(String[] args) throws IOException {
-    args = new String[] {"-f", "/Users/TarVanimelde1/Desktop/CS4223/A2/blackscholes"};
-    CLIModel model = CliFactory.parseArguments(CLIModel.class, args);
+//    args = new String[] {"-p", "MSI", "MESI", "DRAGON",
+//        "-f", "/Users/TarVanimelde1/Desktop/CS4223/A2/fluidanimate",
+//        "-a", "2",
+//        "-c", "8192",
+//        "-b", "32"
+//        //"-f", "/Users/TarVanimelde1/Desktop/CS4223/A2/blackscholes/blackscholes_0.data"
+//        //"-f", "/Users/TarVanimelde1/Desktop/CS4223/test3"
+//    };
+    CLIModel model = null;
+    try {
+      model = CliFactory.parseArguments(CLIModel.class, args);
+    } catch (ArgumentValidationException e) {
+      System.out.println(e.getMessage());
+      System.exit(0);
+    }
+
+    if (model.isSilent()) {
+      Logger log = LogManager.getLogManager().getLogger("");
+      for (Handler h : log.getHandlers()) {
+        h.setLevel(Level.SEVERE);
+      }
+    }
 
     // Need at least one trace file to run the program:
     if (!model.isFiles()) {
@@ -42,7 +63,6 @@ public class Program {
     // Set the properties of the cache:
     Logger.getLogger(Program.class.getName()).log(Level.INFO, "Setting the cache configuration.");
 
-    CacheProperties.setCoherencePolicy(model.getPolicy());
     try {
       CacheProperties.setCacheSize(model.getCacheSize());
       CacheProperties.setBlockSize(model.getBlockSize());
@@ -65,7 +85,9 @@ public class Program {
     Logger.getLogger(Program.class.getName()).log(Level.INFO, "Running the simulation.");
 
     // Run the simulation:
-    testInstructions(instructions);
+    final boolean silent = model.isSilent();
+    final String tracePath = String.join(":", model.getFiles());
+    model.getPolicies().forEach(p -> simulate(instructions, p, silent, tracePath));
   }
 
   private static List<Path> getMatchingFiles(List<String> tracePatterns) {
@@ -92,30 +114,44 @@ public class Program {
     return traces;
   }
 
-  private static void testInstructions(List<List<Instruction>> instructions) {
-    testPolicy(instructions, CoherencePolicy.MSI);
-    testPolicy(instructions, CoherencePolicy.MESI);
-    testPolicy(instructions, CoherencePolicy.DRAGON);
-  }
-
-  private static void testPolicy(List<List<Instruction>> instructions, CoherencePolicy p) {
-    System.out.println("Running with coherence policy " + p);
+  private static void simulate(List<List<Instruction>> instructions,
+                               CoherencePolicy p,
+                               boolean silent,
+                               String tracePath) {
+    Bus.reset();
+    Processor.reset();
+    Logger.getLogger(Program.class.getName()).log(Level.INFO, "Running with coherence policy " + p);
     CacheProperties.setCoherencePolicy(p);
     MultiProcessor multiProcessor = new MultiProcessor();
     instructions.forEach(multiProcessor::addProcessorFor);
     multiProcessor.simulateProgram();
 
-    System.out.println("Bus statistics:");
     BusStatistics busStats = Bus.getStatistics();
-    System.out.println(busStats.toString());
     List<ProcessorStatistics> procStats = multiProcessor.getStatistics();
     ProcessorStatistics summary = procStats.stream()
         .reduce(new ProcessorStatistics(),ProcessorStatistics::combine);
 
-    System.out.println("System statistics:");
-    System.out.println(summary.toString());
-
-    Bus.reset();
+    if (!silent) {
+      System.out.println(busStats.toString());
+      System.out.println(summary.toString());
+    } else {
+      String output = String.join(" ",
+          p.toString(),
+          tracePath,
+          Integer.toString(CacheProperties.getCacheSize()),
+          Integer.toString(CacheProperties.getBlockSize()),
+          Integer.toString(CacheProperties.getAssociativity()),
+          Double.toString(summary.getDataMissRate()),
+          Long.toString(busStats.getBytesWritten()),
+          Integer.toString(busStats.getInvalidations()),
+          Integer.toString(busStats.getBusUpdates()),
+          Integer.toString(summary.getPrivateAccesses()),
+          Integer.toString(summary.getSharedAccesses()),
+          Long.toString(busStats.getAverageWriteLatency()),
+          Integer.toString(summary.getNumCycles())
+      );
+      System.out.print(output);
+    }
   }
 
   private static List<Instruction> parseTrace(Path trace) throws IOException {
