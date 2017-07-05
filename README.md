@@ -1,6 +1,8 @@
-#cache-simulator
+# Coherent Cache Simulator
 
 A configurable coherent cache simulator that accepts memory traces and cache settings. The MSI, MESI, and Dragon (Xerox) protocols are supported, and the simulator is designed to make it easy to extend the simulator to a new invalidation- or update-based protocol, by implementing the abstract class CacheBlock and adding the protocol to the list of protocols in CoherencePolicy. The command-line interface is implemented using the JewelCLI library.
+
+* Apache 2.0 License
 
 The command-line interface options are:
 
@@ -18,7 +20,7 @@ The command-line interface options are:
   
 	[--silent -s] : Only prints severe logs and simulation results to console.
   
-The format of the traces the simulator accepts is
+The expected trace format is
   
 	0 0xFFF1A237 : Load the block containing the address 0xFFF1A237 into the cache (read).
   
