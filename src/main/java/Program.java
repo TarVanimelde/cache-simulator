@@ -21,14 +21,6 @@ import java.util.stream.Collectors;
 
 public class Program {
   public static void main(String[] args) throws IOException {
-//    args = new String[] {"-p", "MSI", "MESI", "DRAGON",
-//        "-f", "/Users/TarVanimelde1/Desktop/CS4223/A2/fluidanimate",
-//        "-a", "2",
-//        "-c", "8192",
-//        "-b", "32"
-//        //"-f", "/Users/TarVanimelde1/Desktop/CS4223/A2/blackscholes/blackscholes_0.data"
-//        //"-f", "/Users/TarVanimelde1/Desktop/CS4223/test3"
-//    };
     CLIModel model = null;
     try {
       model = CliFactory.parseArguments(CLIModel.class, args);
