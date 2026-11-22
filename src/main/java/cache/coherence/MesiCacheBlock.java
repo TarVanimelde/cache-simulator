@@ -41,7 +41,7 @@ public class MesiCacheBlock extends CacheBlock {
           //Bus.remoteCacheContains(local, a) ? CoherenceState.S : CoherenceState.E;
         };
 
-        BusJob job = new BusJob(cache, address, BusAction.BUSRD, finalState);
+        BusJob job = new BusJob(cache, address, BusAction.BUSRD, finalState, true);
         cache.setJob(job);
         break;
       default:
@@ -53,7 +53,6 @@ public class MesiCacheBlock extends CacheBlock {
 
   @Override
   public void writeBlock(Address address) {
-    BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX, (local, a) -> CoherenceState.M);
     switch (state) {
       case M:
         // State is not changed by a local write.
@@ -64,15 +63,15 @@ public class MesiCacheBlock extends CacheBlock {
         Bus.getStatistics().addWriteLatency(0);
         break;
       case S:
-        // Since this is already in the shared state, no other processor can be in the M state.
-        // Just upgrade this block to M and invalidate the other caches' copies.
-        //Bus.broadcastRemoteWrite(cache, address);
-        //BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX,
-         //   (Cache local, Address a) -> CoherenceState.M);
-        //state = CoherenceState.M;
-        cache.setJob(busRdX);
+        // Since this cache already holds a valid copy in S, issue BusUpgr on the bus to invalidate
+        // remote sharers without transferring the data block.
+        BusJob busUpgr = new BusJob(cache, address, BusAction.BUSUPGR,
+            (local, a) -> CoherenceState.M, false);
+        cache.setJob(busUpgr);
         break;
       case I:
+        BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX,
+            (local, a) -> CoherenceState.M, true);
         cache.setJob(busRdX);
         break;
       default:
@@ -86,7 +85,8 @@ public class MesiCacheBlock extends CacheBlock {
   public void remoteRead(Address address) {
     switch (state) {
       case M:
-        Bus.flush(cache, address, CoherenceState.S);
+        state = CoherenceState.S;
+        Bus.getStatistics().incrementFlushes();
         break;
       case E:
         state = CoherenceState.S;
@@ -108,7 +108,8 @@ public class MesiCacheBlock extends CacheBlock {
   public void remoteWrite(Address address) {
     switch (state) {
       case M:
-        Bus.flush(cache, address, CoherenceState.I);
+        state = CoherenceState.I;
+        Bus.getStatistics().incrementFlushes();
         Bus.getStatistics().incrementBusInvalidations();
         break;
       case E:

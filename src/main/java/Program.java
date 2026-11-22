@@ -1,10 +1,10 @@
 import bus.Bus;
 import com.lexicalscope.jewel.cli.ArgumentValidationException;
 import com.lexicalscope.jewel.cli.CliFactory;
+import com.lexicalscope.jewel.cli.HelpRequestedException;
 import statistics.BusStatistics;
 import cache.*;
 import cache.coherence.CoherencePolicy;
-import javafx.util.Pair;
 import statistics.ProcessorStatistics;
 
 import java.io.IOException;
@@ -18,15 +18,22 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Program {
+  private static final Pattern TRACE_PATTERN =
+      Pattern.compile("^\\s*(\\d+)\\s+0[xX]([0-9a-fA-F]+)\\s*$");
+
   public static void main(String[] args) throws IOException {
     CLIModel model = null;
     try {
       model = CliFactory.parseArguments(CLIModel.class, args);
-    } catch (ArgumentValidationException e) {
+    } catch (HelpRequestedException e) {
       System.out.println(e.getMessage());
       System.exit(0);
+    } catch (ArgumentValidationException e) {
+      System.out.println(e.getMessage());
+      System.exit(1);
     }
 
     if (model.isSilent()) {
@@ -39,7 +46,7 @@ public class Program {
     // Need at least one trace file to run the program:
     if (!model.isFiles()) {
       Logger.getLogger(Program.class.getName()).log(Level.SEVERE, "No input file traces, exiting.");
-      System.exit(0);
+      System.exit(1);
     }
 
     // Get all the trace files matching the pattern(s) given:
@@ -49,21 +56,22 @@ public class Program {
     if (traces.isEmpty()) {
       Logger.getLogger(Program.class.getName())
           .log(Level.SEVERE, "No input matching traces found, exiting.");
-      System.exit(0);
+      System.exit(1);
     }
 
     // Set the properties of the cache:
     Logger.getLogger(Program.class.getName()).log(Level.INFO, "Setting the cache configuration.");
 
     try {
-      CacheProperties.setCacheSize(model.getCacheSize());
-      CacheProperties.setBlockSize(model.getBlockSize());
-      CacheProperties.setAssociativity(model.getAssociativity());
+      CacheProperties.configure(
+          model.getCacheSize(),
+          model.getBlockSize(),
+          model.getAssociativity());
     } catch (Exception invalidCacheSetting) {
       Logger.getLogger(Program.class.getName())
           .log(Level.SEVERE, "Invalid cache configuration, exiting.");
       invalidCacheSetting.printStackTrace();
-      System.exit(0);
+      System.exit(1);
     }
 
     // Parse the trace files' instructions:
@@ -82,7 +90,7 @@ public class Program {
     model.getPolicies().forEach(p -> simulate(instructions, p, silent, tracePath));
   }
 
-  private static List<Path> getMatchingFiles(List<String> tracePatterns) {
+  static List<Path> getMatchingFiles(List<String> tracePatterns) {
     List<Path> traces = new ArrayList<>();
 
     for (String traceCandidate : tracePatterns) {
@@ -90,9 +98,11 @@ public class Program {
       if (Files.isRegularFile(p)) {
         traces.add(p);
       } else if (Files.isDirectory(p)) {
-        try {
-          traces.addAll(Files.list(p)
+        try (Stream<Path> stream = Files.list(p)) {
+          traces.addAll(stream
+              .filter(Files::isRegularFile)
               .filter(sub -> sub.toString().endsWith(".data"))
+              .sorted()
               .collect(Collectors.toCollection(ArrayList::new)));
         } catch (IOException e) {
           e.printStackTrace();
@@ -121,7 +131,7 @@ public class Program {
     BusStatistics busStats = Bus.getStatistics();
     List<ProcessorStatistics> procStats = multiProcessor.getStatistics();
     ProcessorStatistics summary = procStats.stream()
-        .reduce(new ProcessorStatistics(),ProcessorStatistics::combine);
+        .reduce(new ProcessorStatistics(), ProcessorStatistics::combine);
 
     if (!silent) {
       System.out.println(busStats.toString());
@@ -140,41 +150,40 @@ public class Program {
           Integer.toString(summary.getPrivateAccesses()),
           Integer.toString(summary.getSharedAccesses()),
           Long.toString(busStats.getAverageWriteLatency()),
-          Integer.toString(summary.getNumCycles())
+          Long.toString(summary.getNumCycles())
       );
-      System.out.print(output);
+      System.out.println(output);
     }
   }
 
-  private static List<Instruction> parseTrace(Path trace) throws IOException {
-    Pattern pattern = Pattern.compile("(\\d)\\s+0x([\\d a-f]+)\\s*");
-    return Files.lines(trace)
-        .map(instr -> {
-          Matcher m = pattern.matcher(instr);
-          if (m.matches()) {
-            return new Pair<>(m.group(1), m.group(2));
-          } else {
-            Logger.getLogger(Program.class.getName())
-                .log(Level.WARNING, "Could not parseTrace instruction: {}", instr);
-            return new Pair<>("3", "-1");
-          }
-        })
-        .map(instr -> {
-          switch (instr.getKey()) {
-            case "0":
-              return new Instruction(InstructionType.LOAD, Long.parseLong(instr.getValue(), 16));
-            case "1":
-              return new Instruction(InstructionType.STORE, Long.parseLong(instr.getValue(), 16));
-            case "2":
-              return new Instruction(InstructionType.OTHER, Long.parseLong(instr.getValue(), 16));
-            default:
+  static List<Instruction> parseTrace(Path trace) throws IOException {
+    try (Stream<String> lines = Files.lines(trace)) {
+      return lines
+          .filter(line -> !line.trim().isEmpty())
+          .map(instr -> {
+            Matcher m = TRACE_PATTERN.matcher(instr);
+            if (!m.matches()) {
               Logger.getLogger(Program.class.getName())
-                  .log(Level.WARNING, "Invalid instruction: {}, cache.Address: {}",
-                      new Object[] {instr.getKey(), instr.getValue()});
-              return new Instruction(InstructionType.INVALID, Long.parseLong(instr.getValue(), 16));
-
-          }
-        })
-        .collect(Collectors.toCollection(ArrayList::new));
+                  .log(Level.WARNING, "Could not parse trace instruction: {0}", instr);
+              return new Instruction(InstructionType.INVALID, -1L);
+            }
+            long value = Long.parseLong(m.group(2), 16);
+            switch (m.group(1)) {
+              case "0":
+                return new Instruction(InstructionType.LOAD, value);
+              case "1":
+                return new Instruction(InstructionType.STORE, value);
+              case "2":
+                return new Instruction(InstructionType.OTHER, value);
+              default:
+                Logger.getLogger(Program.class.getName())
+                    .log(Level.WARNING, "Invalid instruction: {0}, cache.Address: {1}",
+                        new Object[] {m.group(1), m.group(2)});
+                return new Instruction(InstructionType.INVALID, value);
+            }
+          })
+          .filter(instr -> instr.getType() != InstructionType.INVALID)
+          .collect(Collectors.toCollection(ArrayList::new));
+    }
   }
 }

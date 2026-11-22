@@ -26,7 +26,7 @@ public class DragonCacheBlock extends CacheBlock {
          */
         StateEvaluator checkOnlyCacheHolding = (Cache local, Address a) ->
             Bus.remoteCacheContains(local, a) ? CoherenceState.SC : CoherenceState.E;
-        BusJob busRd = new BusJob(cache, address, BusAction.BUSRD, checkOnlyCacheHolding);
+        BusJob busRd = new BusJob(cache, address, BusAction.BUSRD, checkOnlyCacheHolding, true);
         cache.setJob(busRd);
         break;
       case E:
@@ -52,19 +52,18 @@ public class DragonCacheBlock extends CacheBlock {
   public void writeBlock(Address address) {
     /*
       The state after writing to the block will depend on whether any other caches hold a copy of
-      the data at the time the job is isFinished:
+      the data at the time the job is finished:
     */
     StateEvaluator checkOnlyCacheHolding = (Cache local, Address a) ->
         Bus.remoteCacheContains(local, a) ? CoherenceState.SM : CoherenceState.M;
     switch (state) {
       case I:
         /*
-         * First run a BusRd to obtain the data for the cache. Upon completion, immediately send a
-         * BusUpd to inform other caches of the updated word.
+         * Run a BusRd to obtain the block. Per the Dragon specification, only if another cache
+         * holds the block (shared line asserted) is a BusUpd subsequently issued; otherwise it
+         * transitions directly to M with no BusUpd.
          */
-        BusJob successor = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
-        BusJob read = new BusJob(cache, address, BusAction.BUSRD, (local, a) -> CoherenceState.I,
-            successor);
+        BusJob read = BusJob.createDragonWriteMiss(cache, address, checkOnlyCacheHolding);
         cache.setJob(read);
         break;
       case E:
@@ -76,11 +75,11 @@ public class DragonCacheBlock extends CacheBlock {
         Bus.getStatistics().addWriteLatency(0);
         break;
       case SC:
-        BusJob busRdSc = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
+        BusJob busRdSc = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding, false);
         cache.setJob(busRdSc);
         break;
       case SM:
-        BusJob busRdM = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding);
+        BusJob busRdM = new BusJob(cache, address, BusAction.BUSUPD, checkOnlyCacheHolding, false);
         cache.setJob(busRdM);
         break;
       default:
@@ -99,13 +98,15 @@ public class DragonCacheBlock extends CacheBlock {
         state = CoherenceState.SC;
         break;
       case M:
-        Bus.flush(cache, address, CoherenceState.SM);
+        // In Dragon, the M owner supplies the block cache-to-cache and becomes the Sm owner;
+        // main memory is NOT updated until the Sm/M block is evicted.
+        state = CoherenceState.SM;
         break;
       case SC:
         // State is not changed by a remote read.
         break;
       case SM:
-        Bus.flush(cache, address, CoherenceState.SM);
+        // Sm owner supplies the block cache-to-cache and remains Sm; memory is not updated.
         break;
       default:
         Logger.getLogger(getClass().getName()).log(Level.SEVERE,
@@ -154,6 +155,11 @@ public class DragonCacheBlock extends CacheBlock {
       default:
         return false;
     }
+  }
+
+  @Override
+  public boolean flushesToMemoryOnSnoop() {
+    return false;
   }
 
   @Override

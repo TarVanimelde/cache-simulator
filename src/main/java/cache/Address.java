@@ -24,8 +24,8 @@ public class Address {
 
     this.rawAddress = rawAddress;
     this.offset = rawAddress & masks[offsetSize];
-    this.index = (rawAddress >> offsetSize) & masks[indexSize];
-    this.tag = (rawAddress >> (indexSize + offsetSize)) & masks[tagSize];
+    this.index = (rawAddress >>> offsetSize) & masks[indexSize];
+    this.tag = (rawAddress >>> (indexSize + offsetSize)) & masks[tagSize];
   }
 
   public int getTag() {
@@ -46,10 +46,19 @@ public class Address {
 
   @Override
   public boolean equals(Object other) {
-      return other instanceof Address && getTag() == ((Address)other).getTag();
+    if (!(other instanceof Address)) {
+      return false;
+    }
+    Address that = (Address) other;
+    return getTag() == that.getTag() && getIndex() == that.getIndex();
+  }
+
+  @Override
+  public int hashCode() {
+    return 31 * tag + index;
   }
 
   public String toString() {
-    return "tag: " + getTag();
+    return "tag: " + getTag() + ", index: " + getIndex();
   }
 }

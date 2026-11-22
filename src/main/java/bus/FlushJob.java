@@ -58,6 +58,6 @@ public class FlushJob {
   }
 
   public boolean finished() {
-    return cycleCountdown.isFinished();
+    return started && cycleCountdown.isFinished();
   }
 }

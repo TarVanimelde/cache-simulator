@@ -24,7 +24,8 @@ public class MsiCacheBlock extends CacheBlock {
         // State is not changed by a local read.
         break;
       case I:
-        BusJob job = new BusJob(cache, address, BusAction.BUSRD, (local, a) -> CoherenceState.S);
+        BusJob job = new BusJob(cache, address, BusAction.BUSRD, (local, a) -> CoherenceState.S,
+            true);
         cache.setJob(job);
         break;
       default:
@@ -36,21 +37,21 @@ public class MsiCacheBlock extends CacheBlock {
 
   @Override
   public void writeBlock(Address address) {
-    BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX, (local, a) -> CoherenceState.M);
     switch (state) {
       case M:
         // State is not changed by a local write.
         Bus.getStatistics().addWriteLatency(0);
         break;
       case S:
-        // Since this is already in the shared state, no other processor can be in the M state.
-        // Just upgrade this block to M and invalidate the other caches' copies.
-        cache.setJob(busRdX);
-        //Bus.broadcastRemoteWrite(cache, address);
-        //state = CoherenceState.M;
+        // Basic MSI (without BusUpgr) issues BusRdX to invalidate remote copies and upgrade S -> M.
+        BusJob upgradeRdX = new BusJob(cache, address, BusAction.BUSRDX,
+            (local, a) -> CoherenceState.M, false);
+        cache.setJob(upgradeRdX);
         break;
       case I:
-        cache.setJob(busRdX);
+        BusJob missRdX = new BusJob(cache, address, BusAction.BUSRDX,
+            (local, a) -> CoherenceState.M, true);
+        cache.setJob(missRdX);
         break;
       default:
         Logger.getLogger(MsiCacheBlock.class.getName())
@@ -63,7 +64,8 @@ public class MsiCacheBlock extends CacheBlock {
   public void remoteRead(Address address) {
     switch (state) {
       case M:
-        Bus.flush(cache, address, CoherenceState.S);
+        state = CoherenceState.S;
+        Bus.getStatistics().incrementFlushes();
         break;
       case S:
         // State is not changed by a remote read.
@@ -81,7 +83,8 @@ public class MsiCacheBlock extends CacheBlock {
   public void remoteWrite(Address address) {
     switch (state) {
       case M:
-        Bus.flush(cache, address, CoherenceState.I);
+        state = CoherenceState.I;
+        Bus.getStatistics().incrementFlushes();
         Bus.getStatistics().incrementBusInvalidations();
         break;
       case S:
@@ -116,6 +119,12 @@ public class MsiCacheBlock extends CacheBlock {
       default:
         return false;
     }
+  }
+
+  @Override
+  public boolean canSupplyData() {
+    // In MSI (and MUSI), only dirty (M) blocks intervene on the bus; clean (S) misses come from memory.
+    return state == CoherenceState.M;
   }
 
   @Override
