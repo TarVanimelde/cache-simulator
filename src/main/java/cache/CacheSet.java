@@ -116,6 +116,28 @@ public class CacheSet {
     getBlockContaining(address).ifPresent(block -> block.remoteUpdate(address));
   }
 
+  public boolean canSupplyData(Address address) {
+    return getBlockContaining(address)
+        .map(CacheBlock::canSupplyData)
+        .orElse(false);
+  }
+
+  public boolean flushesToMemoryOnSnoop(Address address) {
+    return getBlockContaining(address)
+        .map(CacheBlock::flushesToMemoryOnSnoop)
+        .orElse(false);
+  }
+
+  public void recordAccessFor(Address address) {
+    getBlockContaining(address).ifPresent(block -> {
+      if (block.isShared()) {
+        cache.getStatistics().incrementSharedAccesses();
+      } else {
+        cache.getStatistics().incrementPrivateAccesses();
+      }
+    });
+  }
+
   public void setState(Address address, CoherenceState state) {
     Optional<CacheBlock> optBlock = getBlockContaining(address);
     if (optBlock.isPresent()) {
@@ -124,8 +146,10 @@ public class CacheSet {
       // Need to allocate a block. Assume one is available:
       Optional<CacheBlock> optEmpty = getEmptyBlock();
       if (optEmpty.isPresent()) {
-        optEmpty.get().setAddress(address);
-        optEmpty.get().setState(state);
+        CacheBlock emptyBlock = optEmpty.get();
+        emptyBlock.setAddress(address);
+        emptyBlock.setState(state);
+        blocks.put(emptyBlock, 0L);
       } else {
         Logger.getLogger(getClass().getName())
             .log(Level.SEVERE, "Attempted to set a new block, but none were available.");
@@ -158,11 +182,10 @@ public class CacheSet {
      */
     boolean evictionRequiresFlush = !hasUnusedBlock() && getLru().writeBackOnEvict();
 
-    if (!evictionRequiresFlush) {
+    finishLruEviction();
+    if (evictionRequiresFlush) {
       BusJob job = new BusJob(cache, address, BusAction.EVICTLRU, (local, a) -> CoherenceState.I);
       cache.setJob(job);
-    } else {
-      finishLruEviction();
     }
   }
 }

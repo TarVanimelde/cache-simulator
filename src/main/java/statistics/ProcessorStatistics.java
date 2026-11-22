@@ -10,7 +10,7 @@ public class ProcessorStatistics {
   /*
     The number of cycles that the processor has run.
    */
-  private int cycleCount = 0;
+  private long cycleCount = 0L;
 
   private int writeHits = 0;
   private int writeMisses = 0;
@@ -59,7 +59,7 @@ public class ProcessorStatistics {
   /**
    * Return the number of cycles that the processor has run.
    */
-  public int getNumCycles() {
+  public long getNumCycles() {
     return cycleCount;
   }
 
@@ -108,7 +108,8 @@ public class ProcessorStatistics {
   }
 
   public double getDataMissRate() {
-    return ((double)getReadMisses() + getWriteMisses()) / getNumAccesses();
+    int accesses = getNumAccesses();
+    return accesses == 0 ? 0.0 : ((double) getReadMisses() + getWriteMisses()) / accesses;
   }
 
   public ProcessorStatistics combine(ProcessorStatistics other) {

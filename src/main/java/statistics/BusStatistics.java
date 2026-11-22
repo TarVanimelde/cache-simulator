@@ -1,14 +1,15 @@
 package statistics;
 
 public class BusStatistics {
-  private static long bytesWritten = 0L;
-  private static int busWrites = 0;
-  private static int busReads = 0;
-  private static int busUpdates = 0;
-  private static int flushes = 0;
-  private static int busInvalidations = 0;
-  private static long numWrites = 0;
-  private static long writeLatencies = 0;
+  private long bytesWritten = 0L;
+  private int busWrites = 0;
+  private int busReads = 0;
+  private int busUpdates = 0;
+  private int busUpgrades = 0;
+  private int flushes = 0;
+  private int busInvalidations = 0;
+  private long numWrites = 0;
+  private long writeLatencies = 0;
 
   public void addBytesWritten(int bytesTransferred) {
     bytesWritten += bytesTransferred;
@@ -24,6 +25,10 @@ public class BusStatistics {
 
   public void incrementBusUpdates() {
     busUpdates++;
+  }
+
+  public void incrementBusUpgrades() {
+    busUpgrades++;
   }
 
   public void incrementFlushes() {
@@ -42,6 +47,10 @@ public class BusStatistics {
     return busUpdates;
   }
 
+  public int getBusUpgrades() {
+    return busUpgrades;
+  }
+
   public int getFlushes() {
     return flushes;
   }
@@ -53,7 +62,7 @@ public class BusStatistics {
   }
 
   public long getAverageWriteLatency() {
-    return writeLatencies / numWrites;//((long)getBusWrites() + getBusUpdates());
+    return numWrites == 0 ? 0L : writeLatencies / numWrites;
   }
 
   @Override
@@ -61,6 +70,7 @@ public class BusStatistics {
     return "Bytes transferred on bus: " + getBytesWritten()
         + "\nBus reads: " +  getBusReads()
         + "\nBus writes: " + getBusWrites()
+        + "\nBus upgrades: " + getBusUpgrades()
         + "\nBus updates: " + getBusUpdates()
         + "\nBus flushes: " + getFlushes()
         + "\nBus invalidations: " + getInvalidations()
@@ -72,6 +82,7 @@ public class BusStatistics {
     busWrites = 0;
     busReads = 0;
     busUpdates = 0;
+    busUpgrades = 0;
     flushes = 0;
     busInvalidations = 0;
     numWrites = 0;
@@ -82,7 +93,7 @@ public class BusStatistics {
     busInvalidations++;
   }
 
-  public void addWriteLatency(int writeLatency) {
+  public void addWriteLatency(long writeLatency) {
     numWrites++;
     writeLatencies += writeLatency;
   }

@@ -16,7 +16,7 @@ public interface CLIModel {
   @Option(
       defaultValue="1024",
       longName = "cacheSize",
-      shortName = "cs",
+      shortName = "c",
       description = "The size, in bytes, of the entire cache."
   )
   public int getCacheSize();
@@ -24,7 +24,7 @@ public interface CLIModel {
   @Option(
       defaultValue="16",
       longName = "blockSize",
-      shortName = "bs",
+      shortName = "b",
       description = "The size, in bytes, of one cache block (cache line)."
   )
   public int getBlockSize();

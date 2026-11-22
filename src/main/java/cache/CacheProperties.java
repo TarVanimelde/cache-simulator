@@ -92,54 +92,58 @@ public class CacheProperties {
     policy = p;
   }
 
+  private static boolean isPowerOfTwo(int value) {
+    return value > 0 && (value & (value - 1)) == 0;
+  }
+
+  /**
+   * Atomically validates and updates cacheSize, blockSize, and associativity together so
+   * intermediate setter order cannot falsely reject valid configurations or corrupt static state.
+   */
+  public static void configure(int newCacheSize, int newBlockSize, int newAssociativity)
+      throws Exception {
+    long setSize = (long) newBlockSize * newAssociativity;
+    if (newCacheSize <= 0
+        || newBlockSize < WORD_SIZE
+        || newAssociativity < 1
+        || !isPowerOfTwo(newBlockSize)
+        || newCacheSize % setSize != 0
+        || !isPowerOfTwo((int) (newCacheSize / setSize))) {
+      String cacheConfig = String.format("Invalid cache configuration: Cache Size: %d\n" +
+          "Block Size: %d\n" +
+          "Associativity: %d", newCacheSize, newBlockSize, newAssociativity);
+      throw new Exception(cacheConfig);
+    }
+
+    cacheSize = newCacheSize;
+    blockSize = newBlockSize;
+    associativity = newAssociativity;
+
+    int numBlocks = cacheSize / blockSize;
+    indexSize = Integer.numberOfTrailingZeros(numBlocks / associativity);
+    offsetSize = Integer.numberOfTrailingZeros(blockSize);
+    tagSize = 32 - (offsetSize + indexSize);
+  }
+
   /*
     Block size is assumed to be given in bytes and is set to max(WORD_SIZE, size). This is so that
     at least a word of data can be placed in the cache.
    */
   public static void setBlockSize(int size) throws Exception {
-    blockSize = Math.max(WORD_SIZE, size);
-    updateCacheAddressing();
+    configure(cacheSize, Math.max(WORD_SIZE, size), associativity);
   }
 
   /*
     Cache size is assumed to be given in bytes and is set to max(blockSize, size).
    */
   public static void setCacheSize(int size) throws Exception {
-    if (cacheSize % 2 != 0) {
-      throw new Exception("Cache size must be a power of two.");
-    } else if (cacheSize % blockSize != 0) {
-      throw new Exception("Cache size must be at least as large as the size of one cache block"
-          + " and divisible by the size (in bytes) of a cache block.");
-    } else if ((cacheSize / blockSize) % associativity != 0) {
-      throw new Exception("Cache size must be at least as large as and divisible by the size of one"
-          + " cache set, which is equal to the block size times the associativity of the cache.");
-    }
-    cacheSize = size;
-    updateCacheAddressing();
+    configure(size, blockSize, associativity);
   }
 
   /**
    * Associativity is set to the max(1, associativity).
    */
   public static void setAssociativity(int assoc) throws Exception {
-    associativity = Math.max(1, assoc);
-    updateCacheAddressing();
-  }
-
-  private static void updateCacheAddressing() throws Exception {
-    if (cacheSize % 2 != 0
-        || cacheSize % blockSize != 0
-        || blockSize % WORD_SIZE != 0 // Need caches to be able to hold 32-bit data.
-        || (cacheSize / blockSize) % associativity != 0) {
-      String cacheConfig = String.format("Invalid cache configuration: Cache Size: %d$\n" +
-          "Block Size: %d\n" +
-          "Associativity: %d", cacheSize, blockSize, associativity);
-      throw new Exception(cacheConfig);
-    }
-
-    int numBlocks = cacheSize / blockSize;
-    indexSize = Integer.numberOfTrailingZeros(numBlocks / associativity);
-    offsetSize = Integer.numberOfTrailingZeros(blockSize);
-    tagSize = 32 - (offsetSize + indexSize);
+    configure(cacheSize, blockSize, Math.max(1, assoc));
   }
 }

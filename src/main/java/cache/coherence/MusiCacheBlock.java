@@ -22,14 +22,15 @@ public class MusiCacheBlock extends MsiCacheBlock {
         Bus.getStatistics().addWriteLatency(0);
         break;
       case S:
-        // Since this is already in the shared state, no other processor can be in the M state.
-        // Just upgrade this block to M and invalidate the other caches' copies.
-        Bus.broadcastRemoteWrite(cache, address);
-        state = CoherenceState.M;
-        Bus.getStatistics().addWriteLatency(0);
+        // Since this is already in the shared state, issue a BusUpgr on the shared bus to
+        // serialize the upgrade to M and invalidate remote copies without transferring a block.
+        BusJob busUpgr = new BusJob(cache, address, BusAction.BUSUPGR, (l, a) -> CoherenceState.M,
+            false);
+        cache.setJob(busUpgr);
         break;
       case I:
-        BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX, (l, a) -> CoherenceState.M);
+        BusJob busRdX = new BusJob(cache, address, BusAction.BUSRDX, (l, a) -> CoherenceState.M,
+            true);
         cache.setJob(busRdX);
         break;
       default:

@@ -49,6 +49,24 @@ public abstract class CacheBlock {
    */
   public abstract boolean writeBackOnEvict();
 
+  /**
+   * Returns whether this cache block supplies data directly to a remote cache on a snooped BusRd or
+   * BusRdX (cache-to-cache transfer). Defaults to true when valid; overridden in protocols like MSI
+   * where only dirty (M) blocks intervene on the bus.
+   */
+  public boolean canSupplyData() {
+    return !isInvalid();
+  }
+
+  /**
+   * Returns whether snooping a remote BusRd or BusRdX on this block requires flushing dirty data
+   * back to main memory. True for M in invalidation protocols without an Owned state; false in
+   * Dragon where Sm retains dirty ownership without updating main memory.
+   */
+  public boolean flushesToMemoryOnSnoop() {
+    return state == CoherenceState.M;
+  }
+
   public void invalidate() {
     setState(CoherenceState.I);
   }

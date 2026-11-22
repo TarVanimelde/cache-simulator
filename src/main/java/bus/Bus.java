@@ -28,7 +28,7 @@ public class Bus {
   private static boolean flushing = false; // Is the bus currently being used to flush to memory?
   private static FlushJob flushJob;
 
-  private static int cycleCounter = 0;
+  private static long cycleCounter = 0L;
 
   /*
    * The number of cycles it takes to perform certain actions over the bus:
@@ -76,6 +76,18 @@ public class Bus {
 
   public static boolean remoteCacheContains(Cache local, Address address) {
     return numRemoteCachesContaining(local, address) > 0;
+  }
+
+  public static boolean remoteCacheCanSupply(Cache local, Address address) {
+    return caches.stream()
+        .filter(c -> c.getId() != local.getId())
+        .anyMatch(c -> c.canSupplyData(address));
+  }
+
+  public static boolean remoteCacheFlushesToMemory(Cache local, Address address) {
+    return caches.stream()
+        .filter(c -> c.getId() != local.getId())
+        .anyMatch(c -> c.flushesToMemoryOnSnoop(address));
   }
 
   private static int numRemoteCachesContaining(Cache local, Address address) {
@@ -133,7 +145,7 @@ public class Bus {
     return stats;
   }
 
-  public static int getCycle() {
+  public static long getCycle() {
     return cycleCounter;
   }
 
@@ -142,7 +154,7 @@ public class Bus {
     caches.clear();
     flushing = false;
     currentJob = BusJob.EMPTY_JOB;
-    cycleCounter = 0;
+    cycleCounter = 0L;
     stats.reset();
   }
 }
